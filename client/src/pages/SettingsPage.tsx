@@ -41,7 +41,15 @@ function EditableList({
   const saveMutation = useMutation({
     mutationFn: (updated: string[]) => ipc().settings.set(settingKey, JSON.stringify(updated)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/settings/${settingKey}`] });
+      // refetchType: 'all' forces active and inactive queries to re-fetch
+      // immediately, overriding the staleTime: Infinity default in queryClient.
+      // This ensures ProjectsPage and PublicationsPage pick up the new list
+      // without needing to re-mount.
+      queryClient.invalidateQueries(
+        { queryKey: [`/api/settings/${settingKey}`] },
+        { cancelRefetch: false }
+      );
+      queryClient.refetchQueries({ queryKey: [`/api/settings/${settingKey}`] });
     },
   });
 
