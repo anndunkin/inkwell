@@ -1,35 +1,30 @@
 // When packaged inside an asar, native modules must be loaded from the
-// asarUnpack path (app.asar.unpacked) so the .node binding is accessible.
-// In dev / tests / CI the regular node_modules path works fine.
+// asarUnpack path so the .node binding is accessible on disk.
+// We detect this by checking whether __dirname contains "app.asar" — a
+// reliable signal that works at module-load time on all platforms without
+// needing app.isPackaged or process.resourcesPath (which may not be set yet).
 import path from "path";
 import type BetterSqlite3 from "better-sqlite3";
 
-// Detect whether we're running inside a packaged Electron app.
-// When running under plain Node (unit tests, migration scripts) the `electron`
-// module is not available, so we fall back gracefully.
-function isPackaged(): boolean {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { app } = require("electron") as typeof import("electron");
-    return app?.isPackaged ?? false;
-  } catch {
-    return false;
-  }
-}
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const _require = require;
 
 function loadDatabase(): typeof BetterSqlite3 {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const _require = require;
-  if (isPackaged()) {
-    // Load the native module from the unpacked directory next to the asar
+  const isInsideAsar = __dirname.includes("app.asar");
+  if (isInsideAsar) {
+    // __dirname is something like: C:\...\resources\app.asar\electron\dist
+    // We need:                     C:\...\resources\app.asar.unpacked\node_modules\better-sqlite3
+    // __dirname = .../resources/app.asar/electron/dist  (3 levels up = resources/)
+    const resourcesDir = path.join(__dirname, "..", "..", "..");
     const unpackedPath = path.join(
-      process.resourcesPath,
+      resourcesDir,
       "app.asar.unpacked",
       "node_modules",
       "better-sqlite3"
     );
     return _require(unpackedPath);
   }
+  // Dev / test / CI: plain Node resolve
   return _require("better-sqlite3");
 }
 
