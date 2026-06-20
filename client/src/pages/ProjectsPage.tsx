@@ -215,8 +215,7 @@ export default function ProjectsPage() {
             <DialogTitle style={{ fontFamily: "var(--font-display)" }}>{editProject ? "Edit Project" : "New Project"}</DialogTitle>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="overflow-y-auto px-6 space-y-4 flex-1">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField control={form.control} name="title" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Title</FormLabel>
@@ -312,8 +311,7 @@ export default function ProjectsPage() {
                   <FormControl><Textarea data-testid="input-project-notes" placeholder="Any additional notes…" rows={2} {...field} value={field.value ?? ""} /></FormControl>
                 </FormItem>
               )} />
-            </div>
-              <DialogFooter>
+              <DialogFooter className="pt-2">
                 <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
                 <Button type="submit" data-testid="button-save-project" disabled={createMutation.isPending || updateMutation.isPending}>
                   {editProject ? "Update" : "Create Project"}

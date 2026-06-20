@@ -142,7 +142,7 @@ function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
         <DialogHeader>
           <DialogTitle>{editing ? "Edit Entry" : "Log Published Work"}</DialogTitle>
         </DialogHeader>
-        <div className="overflow-y-auto px-6 space-y-4 flex-1 pb-2">
+        <div className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Publication</label>
             <Select value={pub} onValueChange={setPub}>
