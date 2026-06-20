@@ -120,8 +120,7 @@
       "dist/renderer/**/*",
       "electron/dist/**/*",
       "assets/icon.ico",
-      "package.json",
-      "!node_modules/**/*"
+      "package.json"
     ],
     "asar": true,
     "asarUnpack": [
