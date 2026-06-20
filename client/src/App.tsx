@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import IdeasPage from "./pages/IdeasPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import DeadlinesPage from "./pages/DeadlinesPage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/not-found";
 import { ThemeProvider } from "./components/ThemeProvider";
 
@@ -22,6 +23,7 @@ export default function App() {
               <Route path="/ideas" component={IdeasPage} />
               <Route path="/projects" component={ProjectsPage} />
               <Route path="/deadlines" component={DeadlinesPage} />
+              <Route path="/settings" component={SettingsPage} />
               <Route component={NotFound} />
             </Switch>
           </Layout>

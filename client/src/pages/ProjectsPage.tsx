@@ -3,11 +3,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Trash2, FolderOpen } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FolderOpen, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -18,10 +17,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertProjectSchema, type Project, type InsertProject, type Idea } from "@shared/schema";
 import { z } from "zod";
 
-const formSchema = insertProjectSchema.extend({ title: z.string().min(1, "Title is required") });
-type FormValues = z.infer<typeof formSchema>;
-
-const PROJECT_TYPES = ["article", "book", "essay", "blog", "speech", "report", "policy", "white paper", "other"];
+const DEFAULT_PROJECT_TYPES = ["article", "book", "essay", "blog", "speech", "report", "policy", "white paper", "other"];
+const DEFAULT_PUBLICATIONS: string[] = [];
 const STATUSES = ["active", "on-hold", "completed", "cancelled"];
 
 const STATUS_COLS: Record<string, string> = {
@@ -30,6 +27,14 @@ const STATUS_COLS: Record<string, string> = {
   completed: "bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800",
   cancelled: "bg-gray-50 border-gray-200 dark:bg-gray-900/10 dark:border-gray-700",
 };
+
+const formSchema = insertProjectSchema.extend({ title: z.string().min(1, "Title is required") });
+type FormValues = z.infer<typeof formSchema>;
+
+function parseList(json: string | null | undefined, fallback: string[]): string[] {
+  if (!json) return fallback;
+  try { return JSON.parse(json) as string[]; } catch { return fallback; }
+}
 
 export default function ProjectsPage() {
   const { toast } = useToast();
@@ -41,10 +46,15 @@ export default function ProjectsPage() {
 
   const { data: projects, isLoading } = useQuery<Project[]>({ queryKey: ["/api/projects"] });
   const { data: ideas } = useQuery<Idea[]>({ queryKey: ["/api/ideas"] });
+  const { data: projectTypesRaw } = useQuery<string | null>({ queryKey: ["/api/settings/projectTypes"], queryFn: () => ipc().settings.get("projectTypes") });
+  const { data: publicationsRaw } = useQuery<string | null>({ queryKey: ["/api/settings/publications"], queryFn: () => ipc().settings.get("publications") });
+
+  const projectTypes = parseList(projectTypesRaw, DEFAULT_PROJECT_TYPES);
+  const publications = parseList(publicationsRaw, DEFAULT_PUBLICATIONS);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { title: "", description: "", type: "article", status: "active", ideaId: null, notes: "", createdAt: "" },
+    defaultValues: { title: "", description: "", type: "article", status: "active", ideaId: null, publication: "", notes: "", createdAt: "" },
   });
 
   const createMutation = useMutation({
@@ -64,21 +74,22 @@ export default function ProjectsPage() {
 
   function openNew() {
     setEditProject(null);
-    form.reset({ title: "", description: "", type: "article", status: "active", ideaId: null, notes: "", createdAt: "" });
+    form.reset({ title: "", description: "", type: "article", status: "active", ideaId: null, publication: "", notes: "", createdAt: "" });
     setDialogOpen(true);
   }
 
   function openEdit(p: Project) {
     setEditProject(p);
-    form.reset({ title: p.title, description: p.description ?? "", type: p.type, status: p.status, ideaId: p.ideaId, notes: p.notes ?? "", createdAt: p.createdAt });
+    form.reset({ title: p.title, description: p.description ?? "", type: p.type, status: p.status, ideaId: p.ideaId, publication: p.publication ?? "", notes: p.notes ?? "", createdAt: p.createdAt });
     setDialogOpen(true);
   }
 
   function closeDialog() { setDialogOpen(false); setEditProject(null); }
 
   function onSubmit(values: FormValues) {
-    if (editProject) updateMutation.mutate({ id: editProject.id, data: values });
-    else createMutation.mutate(values);
+    const data = { ...values, publication: values.publication || null };
+    if (editProject) updateMutation.mutate({ id: editProject.id, data });
+    else createMutation.mutate(data);
   }
 
   const filtered = (projects ?? []).filter(p => {
@@ -139,14 +150,22 @@ export default function ProjectsPage() {
               <div className="space-y-2">
                 {grouped[s].map(p => (
                   <div key={p.id} data-testid={`project-card-${p.id}`} className="group bg-card rounded-md p-3 border border-border shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start gap-1 mb-1">
+                    <div className="flex justify-between items-start gap-1 mb-1.5">
                       <p className="text-sm font-medium leading-snug flex-1">{p.title}</p>
                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                         <button onClick={() => openEdit(p)} data-testid={`button-edit-project-${p.id}`} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
                         <button onClick={() => deleteMutation.mutate(p.id)} data-testid={`button-delete-project-${p.id}`} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-xs capitalize">{p.type}</Badge>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="outline" className="text-xs capitalize">{p.type}</Badge>
+                    </div>
+                    {p.publication && (
+                      <div className="flex items-center gap-1 mt-1.5">
+                        <BookOpen className="w-3 h-3 text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground truncate">{p.publication}</span>
+                      </div>
+                    )}
                     {p.description && <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{p.description}</p>}
                   </div>
                 ))}
@@ -162,6 +181,12 @@ export default function ProjectsPage() {
               <div className="flex items-center gap-3 min-w-0">
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{p.title}</p>
+                  {p.publication && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <BookOpen className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <span className="text-xs text-muted-foreground truncate">{p.publication}</span>
+                    </div>
+                  )}
                   {p.description && <p className="text-xs text-muted-foreground truncate">{p.description}</p>}
                 </div>
               </div>
@@ -205,7 +230,7 @@ export default function ProjectsPage() {
                     <FormLabel>Type</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl><SelectTrigger data-testid="select-project-type"><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>{PROJECT_TYPES.map(t => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}</SelectContent>
+                      <SelectContent>{projectTypes.map(t => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}</SelectContent>
                     </Select>
                   </FormItem>
                 )} />
@@ -219,6 +244,18 @@ export default function ProjectsPage() {
                   </FormItem>
                 )} />
               </div>
+              <FormField control={form.control} name="publication" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Publication <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                  <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                    <FormControl><SelectTrigger data-testid="select-project-publication"><SelectValue placeholder="Select a publication…" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="">Unspecified</SelectItem>
+                      {publications.map(pub => <SelectItem key={pub} value={pub}>{pub}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
               {(ideas?.length ?? 0) > 0 && (
                 <FormField control={form.control} name="ideaId" render={({ field }) => (
                   <FormItem>

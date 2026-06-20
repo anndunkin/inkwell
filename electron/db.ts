@@ -70,8 +70,14 @@ const SCHEMA_SQL = `
     type TEXT NOT NULL DEFAULT 'article',
     status TEXT NOT NULL DEFAULT 'active',
     idea_id INTEGER,
+    publication TEXT,
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT ''
+  );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS deadlines (
@@ -100,10 +106,33 @@ export class InkwellDB {
     this.sqlite.pragma("journal_mode = WAL");
     this.sqlite.exec(SCHEMA_SQL);
     this.db = drizzle(this.sqlite);
+
+    // Migrate existing databases: add publication column if missing.
+    try {
+      this.sqlite.exec("ALTER TABLE projects ADD COLUMN publication TEXT");
+    } catch {
+      // Column already exists — safe to ignore.
+    }
+
+    // Initialize default settings for new files.
+    const defaultProjectTypes = ["article","book","essay","blog","speech","report","policy","white paper","other"];
+    const defaultPublications = ["The Atlantic","Foreign Affairs","Politico","The Hill","Energy Monitor","Utility Dive","other"];
+    if (!this.getSetting("projectTypes")) this.setSetting("projectTypes", JSON.stringify(defaultProjectTypes));
+    if (!this.getSetting("publications")) this.setSetting("publications", JSON.stringify(defaultPublications));
   }
 
   close() {
     this.sqlite.close();
+  }
+
+  // ---- Settings ----
+  getSetting(key: string): string | null {
+    const row = this.sqlite.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+  }
+
+  setSetting(key: string, value: string): void {
+    this.sqlite.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
   }
 
   // ---- Ideas ----

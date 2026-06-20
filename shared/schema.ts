@@ -26,8 +26,15 @@ export const projects = sqliteTable("projects", {
   type: text("type").notNull().default("article"), // article, book, essay, blog, speech, report, other
   status: text("status").notNull().default("active"), // active, on-hold, completed, cancelled
   ideaId: integer("idea_id"), // optional link to an idea
+  publication: text("publication"), // target publication outlet
   notes: text("notes"),
   createdAt: text("created_at").notNull().default(""),
+});
+
+// User-editable settings stored as JSON strings
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
 });
 
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });

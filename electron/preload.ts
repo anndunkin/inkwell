@@ -41,6 +41,10 @@ export interface InkwellApi {
     saveAs: () => Promise<FileResult>;
     getRecentFiles: () => Promise<string[]>;
   };
+  settings: {
+    get: (key: string) => Promise<string | null>;
+    set: (key: string, value: string) => Promise<void>;
+  };
   /** Subscribe to main-process "refresh" events (fired after file switches). */
   onRefresh: (callback: () => void) => () => void;
 }
@@ -72,6 +76,10 @@ const api: InkwellApi = {
     save: () => ipcRenderer.invoke("file:save"),
     saveAs: () => ipcRenderer.invoke("file:saveAs"),
     getRecentFiles: () => ipcRenderer.invoke("file:getRecentFiles"),
+  },
+  settings: {
+    get: (key) => ipcRenderer.invoke("settings:get", key),
+    set: (key, value) => ipcRenderer.invoke("settings:set", key, value),
   },
   onRefresh: (callback) => {
     const listener = () => callback();

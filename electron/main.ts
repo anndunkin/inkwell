@@ -277,6 +277,13 @@ function registerIpc() {
   ipcMain.handle("file:save", () => doSave());
   ipcMain.handle("file:saveAs", () => doSaveAs());
   ipcMain.handle("file:getRecentFiles", () => getRecentFiles().slice(0, RECENT_FILES_MENU));
+
+  // Settings
+  ipcMain.handle("settings:get", (_e, key: string) => requireDb().getSetting(key));
+  ipcMain.handle("settings:set", (_e, key: string, value: string) => {
+    requireDb().setSetting(key, value);
+    setDirty(true);
+  });
 }
 
 function createWindow() {
