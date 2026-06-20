@@ -1,4 +1,40 @@
-import Database from "better-sqlite3";
+// When packaged inside an asar, native modules must be loaded from the
+// asarUnpack path (app.asar.unpacked) so the .node binding is accessible.
+// In dev / tests / CI the regular node_modules path works fine.
+import path from "path";
+import type BetterSqlite3 from "better-sqlite3";
+
+// Detect whether we're running inside a packaged Electron app.
+// When running under plain Node (unit tests, migration scripts) the `electron`
+// module is not available, so we fall back gracefully.
+function isPackaged(): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { app } = require("electron") as typeof import("electron");
+    return app?.isPackaged ?? false;
+  } catch {
+    return false;
+  }
+}
+
+function loadDatabase(): typeof BetterSqlite3 {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const _require = require;
+  if (isPackaged()) {
+    // Load the native module from the unpacked directory next to the asar
+    const unpackedPath = path.join(
+      process.resourcesPath,
+      "app.asar.unpacked",
+      "node_modules",
+      "better-sqlite3"
+    );
+    return _require(unpackedPath);
+  }
+  return _require("better-sqlite3");
+}
+
+const Database = loadDatabase() as unknown as typeof BetterSqlite3;
+
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { eq } from "drizzle-orm";
 import { ideas, projects, deadlines } from "../shared/schema";
