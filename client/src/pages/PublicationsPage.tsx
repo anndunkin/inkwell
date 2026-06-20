@@ -67,12 +67,18 @@ function statusColor(days: number): string {
 interface LogDialogProps {
   open: boolean;
   onClose: () => void;
-  publications: string[];
   projects: Project[];
   editing: PublicationHistory | null;
 }
 
-function LogDialog({ open, onClose, publications, projects, editing }: LogDialogProps) {
+function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
+  // Query publications fresh inside the dialog so newly added outlets appear
+  // immediately without needing to close and reopen.
+  const { data: pubsRaw } = useQuery<string | null>({
+    queryKey: ["/api/settings/publications"],
+    queryFn: () => ipc().settings.get("publications"),
+  });
+  const publications = parseList(pubsRaw, []);
   const { toast } = useToast();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -136,7 +142,7 @@ function LogDialog({ open, onClose, publications, projects, editing }: LogDialog
         <DialogHeader>
           <DialogTitle>{editing ? "Edit Entry" : "Log Published Work"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-1">
+        <div className="overflow-y-auto px-6 space-y-4 flex-1 pb-2">
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Publication</label>
             <Select value={pub} onValueChange={setPub}>
@@ -403,7 +409,6 @@ export default function PublicationsPage() {
       <LogDialog
         open={logOpen}
         onClose={() => setLogOpen(false)}
-        publications={publications}
         projects={projects}
         editing={editing}
       />
