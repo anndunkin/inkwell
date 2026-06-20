@@ -9,6 +9,7 @@ import type {
   InsertProject,
   InsertDeadline,
   InsertPublicationHistory,
+  InsertMilestone,
 } from "../shared/schema";
 
 // ---- Crash logging ----
@@ -285,6 +286,13 @@ function registerIpc() {
     requireDb().setSetting(key, value);
     setDirty(true);
   });
+
+  // Milestones
+  ipcMain.handle("milestones:getAll", () => requireDb().getAllMilestones());
+  ipcMain.handle("milestones:getForProject", (_e, projectId: number) => requireDb().getMilestonesForProject(projectId));
+  ipcMain.handle("milestones:create", (_e, data: InsertMilestone) => dirtyAfter(requireDb().createMilestone(data)));
+  ipcMain.handle("milestones:update", (_e, id: number, data: Partial<InsertMilestone>) => dirtyAfter(requireDb().updateMilestone(id, data)));
+  ipcMain.handle("milestones:delete", (_e, id: number) => dirtyAfter(requireDb().deleteMilestone(id)));
 
   // Publication history
   ipcMain.handle("pubHistory:getAll", () => requireDb().getAllPublicationHistory());

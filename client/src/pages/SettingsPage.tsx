@@ -16,6 +16,7 @@ function parseList(json: string | null | undefined, fallback: string[]): string[
 
 const DEFAULT_PROJECT_TYPES = ["article", "book", "essay", "blog", "speech", "report", "policy", "white paper", "other"];
 const DEFAULT_PUBLICATIONS = ["The Atlantic", "Foreign Affairs", "Politico", "The Hill", "Energy Monitor", "Utility Dive", "other"];
+const DEFAULT_MILESTONE_NAMES = ["First Draft", "Second Draft", "With Editor", "Final Review", "Fact Check", "Copy Edit", "Submitted", "Published"];
 
 function EditableList({
   title,
@@ -143,6 +144,12 @@ export default function SettingsPage() {
           description="Categories for classifying your writing projects."
           settingKey="projectTypes"
           defaultItems={DEFAULT_PROJECT_TYPES}
+        />
+        <EditableList
+          title="Milestone Names"
+          description="Names available when adding milestones to a project (e.g. First Draft, With Editor)."
+          settingKey="milestoneNames"
+          defaultItems={DEFAULT_MILESTONE_NAMES}
         />
       </div>
     </div>

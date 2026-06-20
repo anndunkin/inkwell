@@ -36,6 +36,10 @@ export async function ipcQuery<T>(queryKey: readonly unknown[]): Promise<T> {
       return api.settings.get("projectTypes") as Promise<T>;
     case "/api/settings/publications":
       return api.settings.get("publications") as Promise<T>;
+    case "/api/milestones":
+      return api.milestones.getAll() as Promise<T>;
+    case "/api/settings/milestoneNames":
+      return api.settings.get("milestoneNames") as Promise<T>;
     case "/api/pubHistory":
       return api.pubHistory.getAll() as Promise<T>;
     default:

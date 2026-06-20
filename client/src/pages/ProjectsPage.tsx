@@ -4,6 +4,7 @@ import { queryClient } from "@/lib/queryClient";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, Pencil, Trash2, FolderOpen, BookOpen, RefreshCw } from "lucide-react";
+import MilestonesPanel from "@/components/MilestonesPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -172,6 +173,7 @@ export default function ProjectsPage() {
                       </div>
                     )}
                     {p.description && <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{p.description}</p>}
+                    <MilestonesPanel projectId={p.id} projectTitle={p.title} />
                   </div>
                 ))}
                 {grouped[s].length === 0 && <p className="text-xs text-muted-foreground text-center py-4">None</p>}

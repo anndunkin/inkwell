@@ -58,6 +58,22 @@ export const insertProjectSchema = createInsertSchema(projects).omit({ id: true 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 
+// Project Milestones
+export const milestones = sqliteTable("milestones", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  name: text("name").notNull(), // e.g. "First Draft", "With Editor"
+  status: text("status").notNull().default("pending"), // pending, in-progress, complete
+  dueDate: text("due_date"), // YYYY-MM-DD, optional
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
+export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
+export type Milestone = typeof milestones.$inferSelect;
+
 // Deadlines
 export const deadlines = sqliteTable("deadlines", {
   id: integer("id").primaryKey({ autoIncrement: true }),

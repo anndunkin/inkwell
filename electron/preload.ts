@@ -8,6 +8,8 @@ import type {
   InsertDeadline,
   PublicationHistory,
   InsertPublicationHistory,
+  Milestone,
+  InsertMilestone,
 } from "../shared/schema";
 
 export interface FileResult {
@@ -42,6 +44,13 @@ export interface InkwellApi {
     save: () => Promise<FileResult>;
     saveAs: () => Promise<FileResult>;
     getRecentFiles: () => Promise<string[]>;
+  };
+  milestones: {
+    getAll: () => Promise<Milestone[]>;
+    getForProject: (projectId: number) => Promise<Milestone[]>;
+    create: (data: InsertMilestone) => Promise<Milestone>;
+    update: (id: number, data: Partial<InsertMilestone>) => Promise<Milestone>;
+    delete: (id: number) => Promise<boolean>;
   };
   pubHistory: {
     getAll: () => Promise<PublicationHistory[]>;
@@ -84,6 +93,13 @@ const api: InkwellApi = {
     save: () => ipcRenderer.invoke("file:save"),
     saveAs: () => ipcRenderer.invoke("file:saveAs"),
     getRecentFiles: () => ipcRenderer.invoke("file:getRecentFiles"),
+  },
+  milestones: {
+    getAll: () => ipcRenderer.invoke("milestones:getAll"),
+    getForProject: (projectId: number) => ipcRenderer.invoke("milestones:getForProject", projectId),
+    create: (data: InsertMilestone) => ipcRenderer.invoke("milestones:create", data),
+    update: (id: number, data: Partial<InsertMilestone>) => ipcRenderer.invoke("milestones:update", id, data),
+    delete: (id: number) => ipcRenderer.invoke("milestones:delete", id),
   },
   pubHistory: {
     getAll: () => ipcRenderer.invoke("pubHistory:getAll"),

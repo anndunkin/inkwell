@@ -41,7 +41,7 @@ const Database = loadDatabase() as unknown as typeof BetterSqlite3;
 
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { eq, desc } from "drizzle-orm";
-import { ideas, projects, deadlines, publicationHistory } from "../shared/schema";
+import { ideas, projects, deadlines, publicationHistory, milestones } from "../shared/schema";
 import type {
   Idea,
   InsertIdea,
@@ -51,6 +51,8 @@ import type {
   InsertDeadline,
   PublicationHistory,
   InsertPublicationHistory,
+  Milestone,
+  InsertMilestone,
 } from "../shared/schema";
 
 const SCHEMA_SQL = `
@@ -92,6 +94,17 @@ const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS milestones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    due_date TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT ''
   );
 
   CREATE TABLE IF NOT EXISTS deadlines (
@@ -142,8 +155,10 @@ export class InkwellDB {
     // Initialize default settings for new files.
     const defaultProjectTypes = ["article","book","essay","blog","speech","report","policy","white paper","other"];
     const defaultPublications = ["The Atlantic","Foreign Affairs","Politico","The Hill","Energy Monitor","Utility Dive","other"];
+    const defaultMilestoneNames = ["First Draft","Second Draft","With Editor","Final Review","Fact Check","Copy Edit","Submitted","Published"];
     if (!this.getSetting("projectTypes")) this.setSetting("projectTypes", JSON.stringify(defaultProjectTypes));
     if (!this.getSetting("publications")) this.setSetting("publications", JSON.stringify(defaultPublications));
+    if (!this.getSetting("milestoneNames")) this.setSetting("milestoneNames", JSON.stringify(defaultMilestoneNames));
   }
 
   close() {
@@ -211,6 +226,39 @@ export class InkwellDB {
   }
   deletePublicationHistory(id: number): boolean {
     return this.db.delete(publicationHistory).where(eq(publicationHistory.id, id)).run().changes > 0;
+  }
+
+  // ---- Milestones ----
+  getMilestonesForProject(projectId: number): Milestone[] {
+    return this.db.select().from(milestones)
+      .where(eq(milestones.projectId, projectId))
+      .orderBy(milestones.sortOrder, milestones.createdAt)
+      .all();
+  }
+
+  getAllMilestones(): Milestone[] {
+    return this.db.select().from(milestones)
+      .orderBy(milestones.projectId, milestones.sortOrder)
+      .all();
+  }
+
+  createMilestone(data: InsertMilestone): Milestone {
+    const createdAt = new Date().toISOString();
+    // sortOrder = current max for this project + 1
+    const maxRow = this.sqlite
+      .prepare("SELECT COALESCE(MAX(sort_order),0) as m FROM milestones WHERE project_id = ?")
+      .get(data.projectId) as { m: number };
+    return this.db.insert(milestones)
+      .values({ ...data, sortOrder: maxRow.m + 1, createdAt })
+      .returning().get();
+  }
+
+  updateMilestone(id: number, data: Partial<InsertMilestone>): Milestone | undefined {
+    return this.db.update(milestones).set(data).where(eq(milestones.id, id)).returning().get();
+  }
+
+  deleteMilestone(id: number): boolean {
+    return this.db.delete(milestones).where(eq(milestones.id, id)).run().changes > 0;
   }
 
   // ---- Deadlines ----
