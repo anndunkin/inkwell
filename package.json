@@ -136,14 +136,8 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "requestedExecutionLevel": "asInvoker",
-      "forceCodeSigning": false,
-      "signAndEditExecutable": false,
-      "signtoolOptions": {
-        "signingHashAlgorithms": [
-          "sha256"
-        ]
-      }
+      "requestedExecutionLevel": "requireAdministrator",
+      "forceCodeSigning": false
     },
     "nsis": {
       "oneClick": false,

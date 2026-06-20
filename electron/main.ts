@@ -10,6 +10,19 @@ import type {
   InsertDeadline,
 } from "../shared/schema";
 
+// Surface unhandled errors as a visible dialog rather than a silent quit.
+// This is especially important in production where there is no DevTools console.
+process.on("uncaughtException", (err) => {
+  // Try to show a dialog; fall back to stderr if the app isn't ready yet.
+  const msg = err?.stack ?? String(err);
+  if (app.isReady()) {
+    dialog.showErrorBox("Inkwell — Unexpected Error", msg);
+  } else {
+    process.stderr.write(msg + "\n");
+  }
+  app.exit(1);
+});
+
 // Dev mode = unpackaged AND not explicitly forced to production (e.g. e2e tests
 // run the built app via `electron .` with NODE_ENV=production and no Vite server).
 const isDev = !app.isPackaged && process.env.NODE_ENV !== "production";

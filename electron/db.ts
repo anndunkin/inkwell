@@ -1,8 +1,7 @@
 // When packaged inside an asar, native modules must be loaded from the
 // asarUnpack path so the .node binding is accessible on disk.
-// We detect this by checking whether __dirname contains "app.asar" — a
-// reliable signal that works at module-load time on all platforms without
-// needing app.isPackaged or process.resourcesPath (which may not be set yet).
+// Detection: __dirname.includes("app.asar") is the reliable packaged signal.
+// Path:      process.resourcesPath gives the resources/ dir reliably on Windows.
 import path from "path";
 import type BetterSqlite3 from "better-sqlite3";
 
@@ -10,20 +9,30 @@ import type BetterSqlite3 from "better-sqlite3";
 const _require = require;
 
 function loadDatabase(): typeof BetterSqlite3 {
-  const isInsideAsar = __dirname.includes("app.asar");
-  if (isInsideAsar) {
-    // __dirname is something like: C:\...\resources\app.asar\electron\dist
-    // We need:                     C:\...\resources\app.asar.unpacked\node_modules\better-sqlite3
-    // __dirname = .../resources/app.asar/electron/dist  (3 levels up = resources/)
-    const resourcesDir = path.join(__dirname, "..", "..", "..");
+  // Detect a packaged build by checking whether __dirname is inside an asar.
+  // This is the only reliable signal at module-load time: app.isPackaged may
+  // not be set yet (it is set after app.whenReady), and process.resourcesPath
+  // is defined even in dev mode when Electron is launched via `electron .`.
+  //
+  // When packaged:
+  //   __dirname = C:\...\resources\app.asar\electron\dist
+  // When dev / test:
+  //   __dirname = /home/user/workspace/inkwell/electron/dist  (no "app.asar")
+  const isPackaged = __dirname.includes("app.asar");
+
+  if (isPackaged) {
+    // process.resourcesPath always points to the resources/ directory in a
+    // packaged build, regardless of __dirname depth.
+    //   Windows: C:\Program Files\Inkwell\resources
     const unpackedPath = path.join(
-      resourcesDir,
+      process.resourcesPath,
       "app.asar.unpacked",
       "node_modules",
       "better-sqlite3"
     );
     return _require(unpackedPath);
   }
+
   // Dev / test / CI: plain Node resolve
   return _require("better-sqlite3");
 }
