@@ -1,0 +1,83 @@
+import { contextBridge, ipcRenderer } from "electron";
+import type {
+  Idea,
+  InsertIdea,
+  Project,
+  InsertProject,
+  Deadline,
+  InsertDeadline,
+} from "../shared/schema";
+
+export interface FileResult {
+  success: boolean;
+  path?: string;
+}
+
+export interface InkwellApi {
+  ideas: {
+    getAll: () => Promise<Idea[]>;
+    create: (data: InsertIdea) => Promise<Idea>;
+    update: (id: number, data: Partial<InsertIdea>) => Promise<Idea>;
+    delete: (id: number) => Promise<boolean>;
+  };
+  projects: {
+    getAll: () => Promise<Project[]>;
+    create: (data: InsertProject) => Promise<Project>;
+    update: (id: number, data: Partial<InsertProject>) => Promise<Project>;
+    delete: (id: number) => Promise<boolean>;
+  };
+  deadlines: {
+    getAll: () => Promise<Deadline[]>;
+    create: (data: InsertDeadline) => Promise<Deadline>;
+    update: (id: number, data: Partial<InsertDeadline>) => Promise<Deadline>;
+    delete: (id: number) => Promise<boolean>;
+  };
+  file: {
+    currentPath: () => Promise<string | null>;
+    isDirty: () => Promise<boolean>;
+    newFile: () => Promise<FileResult>;
+    open: () => Promise<FileResult>;
+    save: () => Promise<FileResult>;
+    saveAs: () => Promise<FileResult>;
+    getRecentFiles: () => Promise<string[]>;
+  };
+  /** Subscribe to main-process "refresh" events (fired after file switches). */
+  onRefresh: (callback: () => void) => () => void;
+}
+
+const api: InkwellApi = {
+  ideas: {
+    getAll: () => ipcRenderer.invoke("ideas:getAll"),
+    create: (data) => ipcRenderer.invoke("ideas:create", data),
+    update: (id, data) => ipcRenderer.invoke("ideas:update", id, data),
+    delete: (id) => ipcRenderer.invoke("ideas:delete", id),
+  },
+  projects: {
+    getAll: () => ipcRenderer.invoke("projects:getAll"),
+    create: (data) => ipcRenderer.invoke("projects:create", data),
+    update: (id, data) => ipcRenderer.invoke("projects:update", id, data),
+    delete: (id) => ipcRenderer.invoke("projects:delete", id),
+  },
+  deadlines: {
+    getAll: () => ipcRenderer.invoke("deadlines:getAll"),
+    create: (data) => ipcRenderer.invoke("deadlines:create", data),
+    update: (id, data) => ipcRenderer.invoke("deadlines:update", id, data),
+    delete: (id) => ipcRenderer.invoke("deadlines:delete", id),
+  },
+  file: {
+    currentPath: () => ipcRenderer.invoke("file:currentPath"),
+    isDirty: () => ipcRenderer.invoke("file:isDirty"),
+    newFile: () => ipcRenderer.invoke("file:newFile"),
+    open: () => ipcRenderer.invoke("file:open"),
+    save: () => ipcRenderer.invoke("file:save"),
+    saveAs: () => ipcRenderer.invoke("file:saveAs"),
+    getRecentFiles: () => ipcRenderer.invoke("file:getRecentFiles"),
+  },
+  onRefresh: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("inkwell:refresh", listener);
+    return () => ipcRenderer.removeListener("inkwell:refresh", listener);
+  },
+};
+
+contextBridge.exposeInMainWorld("inkwell", api);

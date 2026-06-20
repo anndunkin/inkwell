@@ -1,0 +1,24 @@
+node_modules/
+dist/
+electron/dist/
+release/
+.vite/
+
+# SQLite database / data files — never commit
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.inkwell
+
+# Test artifacts
+test-results/
+playwright-report/
+.playwright/
+
+.env
+.env.*
+!.env.example
+
+*.log
+.DS_Store

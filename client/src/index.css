@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Writing tool palette — warm parchment surfaces, deep ink accent */
+    --background: 38 28% 95%;
+    --foreground: 30 20% 14%;
+    --card: 40 25% 97%;
+    --card-foreground: 30 20% 14%;
+    --popover: 40 25% 97%;
+    --popover-foreground: 30 20% 14%;
+    --primary: 200 55% 28%;
+    --primary-foreground: 40 25% 97%;
+    --secondary: 38 18% 90%;
+    --secondary-foreground: 30 20% 22%;
+    --muted: 38 14% 88%;
+    --muted-foreground: 30 8% 46%;
+    --accent: 38 18% 90%;
+    --accent-foreground: 30 20% 22%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 36 12% 82%;
+    --input: 36 12% 82%;
+    --ring: 200 55% 28%;
+    --radius: 0.5rem;
+
+    /* Sidebar */
+    --sidebar-background: 35 22% 92%;
+    --sidebar-foreground: 30 20% 18%;
+    --sidebar-primary: 200 55% 28%;
+    --sidebar-primary-foreground: 40 25% 97%;
+    --sidebar-accent: 38 18% 86%;
+    --sidebar-accent-foreground: 30 20% 18%;
+    --sidebar-border: 36 12% 80%;
+    --sidebar-ring: 200 55% 28%;
+
+    /* Semantic colors */
+    --color-success: 100 50% 32%;
+    --color-warning: 38 85% 45%;
+    --color-error: 0 72% 51%;
+
+    /* Custom tokens */
+    --font-display: 'Lora', Georgia, serif;
+    --font-body: 'DM Sans', system-ui, sans-serif;
+  }
+
+  .dark {
+    --background: 30 12% 8%;
+    --foreground: 38 15% 82%;
+    --card: 30 10% 11%;
+    --card-foreground: 38 15% 82%;
+    --popover: 30 10% 11%;
+    --popover-foreground: 38 15% 82%;
+    --primary: 200 45% 55%;
+    --primary-foreground: 30 12% 8%;
+    --secondary: 30 8% 18%;
+    --secondary-foreground: 38 12% 72%;
+    --muted: 30 7% 16%;
+    --muted-foreground: 38 6% 50%;
+    --accent: 30 8% 18%;
+    --accent-foreground: 38 12% 72%;
+    --destructive: 0 60% 48%;
+    --destructive-foreground: 38 15% 82%;
+    --border: 30 7% 22%;
+    --input: 30 7% 22%;
+    --ring: 200 45% 55%;
+
+    --sidebar-background: 30 10% 10%;
+    --sidebar-foreground: 38 12% 72%;
+    --sidebar-primary: 200 45% 55%;
+    --sidebar-primary-foreground: 30 12% 8%;
+    --sidebar-accent: 30 8% 16%;
+    --sidebar-accent-foreground: 38 12% 72%;
+    --sidebar-border: 30 7% 20%;
+    --sidebar-ring: 200 45% 55%;
+
+    --color-success: 100 45% 50%;
+    --color-warning: 38 80% 55%;
+    --color-error: 0 60% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    line-height: 1.2;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+    color: hsl(var(--foreground));
+  }
+}
+
+/* Priority badge colors */
+.priority-low { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400; }
+.priority-medium { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400; }
+.priority-high { @apply bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400; }
+.priority-critical { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400; }
+
+/* Status badge colors */
+.status-new { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400; }
+.status-developing { @apply bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400; }
+.status-parked { @apply bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400; }
+.status-published { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400; }
+.status-active { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400; }
+.status-on-hold { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400; }
+.status-completed { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400; }
+.status-cancelled { @apply bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400; }
+.status-pending { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400; }
+.status-missed { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400; }
+
+/* Overdue highlight */
+.overdue { @apply border-l-4 border-red-400; }
