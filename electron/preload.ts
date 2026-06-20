@@ -6,6 +6,8 @@ import type {
   InsertProject,
   Deadline,
   InsertDeadline,
+  PublicationHistory,
+  InsertPublicationHistory,
 } from "../shared/schema";
 
 export interface FileResult {
@@ -40,6 +42,12 @@ export interface InkwellApi {
     save: () => Promise<FileResult>;
     saveAs: () => Promise<FileResult>;
     getRecentFiles: () => Promise<string[]>;
+  };
+  pubHistory: {
+    getAll: () => Promise<PublicationHistory[]>;
+    create: (data: InsertPublicationHistory) => Promise<PublicationHistory>;
+    update: (id: number, data: Partial<InsertPublicationHistory>) => Promise<PublicationHistory>;
+    delete: (id: number) => Promise<boolean>;
   };
   settings: {
     get: (key: string) => Promise<string | null>;
@@ -76,6 +84,12 @@ const api: InkwellApi = {
     save: () => ipcRenderer.invoke("file:save"),
     saveAs: () => ipcRenderer.invoke("file:saveAs"),
     getRecentFiles: () => ipcRenderer.invoke("file:getRecentFiles"),
+  },
+  pubHistory: {
+    getAll: () => ipcRenderer.invoke("pubHistory:getAll"),
+    create: (data) => ipcRenderer.invoke("pubHistory:create", data),
+    update: (id, data) => ipcRenderer.invoke("pubHistory:update", id, data),
+    delete: (id) => ipcRenderer.invoke("pubHistory:delete", id),
   },
   settings: {
     get: (key) => ipcRenderer.invoke("settings:get", key),

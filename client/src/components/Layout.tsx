@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Lightbulb, FolderOpen, Calendar, LayoutDashboard, Moon, Sun, Settings } from "lucide-react";
+import { Lightbulb, FolderOpen, Calendar, LayoutDashboard, Moon, Sun, Settings, BookOpen } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/ideas", label: "Ideas", icon: Lightbulb },
   { href: "/projects", label: "Projects", icon: FolderOpen },
   { href: "/deadlines", label: "Deadlines", icon: Calendar },
+  { href: "/publications", label: "Publications", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

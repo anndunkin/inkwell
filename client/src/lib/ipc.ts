@@ -36,6 +36,8 @@ export async function ipcQuery<T>(queryKey: readonly unknown[]): Promise<T> {
       return api.settings.get("projectTypes") as Promise<T>;
     case "/api/settings/publications":
       return api.settings.get("publications") as Promise<T>;
+    case "/api/pubHistory":
+      return api.pubHistory.getAll() as Promise<T>;
     default:
       throw new Error(`No IPC query handler for key: ${path}`);
   }

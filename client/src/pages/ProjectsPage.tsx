@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Trash2, FolderOpen, BookOpen } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FolderOpen, BookOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -52,9 +52,11 @@ export default function ProjectsPage() {
   const projectTypes = parseList(projectTypesRaw, DEFAULT_PROJECT_TYPES);
   const publications = parseList(publicationsRaw, DEFAULT_PUBLICATIONS);
 
+  const INTERVALS = ["weekly", "biweekly", "monthly", "quarterly", "annual"];
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { title: "", description: "", type: "article", status: "active", ideaId: null, publication: "", notes: "", createdAt: "" },
+    defaultValues: { title: "", description: "", type: "article", status: "active", ideaId: null, publication: "", isRecurring: false, recurringInterval: null, notes: "", createdAt: "" },
   });
 
   const createMutation = useMutation({
@@ -74,13 +76,13 @@ export default function ProjectsPage() {
 
   function openNew() {
     setEditProject(null);
-    form.reset({ title: "", description: "", type: "article", status: "active", ideaId: null, publication: "", notes: "", createdAt: "" });
+    form.reset({ title: "", description: "", type: "article", status: "active", ideaId: null, publication: "", isRecurring: false, recurringInterval: null, notes: "", createdAt: "" });
     setDialogOpen(true);
   }
 
   function openEdit(p: Project) {
     setEditProject(p);
-    form.reset({ title: p.title, description: p.description ?? "", type: p.type, status: p.status, ideaId: p.ideaId, publication: p.publication ?? "", notes: p.notes ?? "", createdAt: p.createdAt });
+    form.reset({ title: p.title, description: p.description ?? "", type: p.type, status: p.status, ideaId: p.ideaId, publication: p.publication ?? "", isRecurring: p.isRecurring ?? false, recurringInterval: p.recurringInterval ?? null, notes: p.notes ?? "", createdAt: p.createdAt });
     setDialogOpen(true);
   }
 
@@ -159,6 +161,9 @@ export default function ProjectsPage() {
                     </div>
                     <div className="flex flex-wrap gap-1">
                       <Badge variant="outline" className="text-xs capitalize">{p.type}</Badge>
+                      {p.isRecurring && (
+                        <Badge variant="secondary" className="text-xs gap-1"><RefreshCw className="w-2.5 h-2.5" />{p.recurringInterval}</Badge>
+                      )}
                     </div>
                     {p.publication && (
                       <div className="flex items-center gap-1 mt-1.5">
@@ -265,6 +270,36 @@ export default function ProjectsPage() {
                       <SelectContent>
                         <SelectItem value="none">No linked idea</SelectItem>
                         {ideas?.map(i => <SelectItem key={i.id} value={String(i.id)}>{i.title}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+              )}
+              {/* Recurring */}
+              <FormField control={form.control} name="isRecurring" render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="isRecurring"
+                      checked={!!field.value}
+                      onChange={e => field.onChange(e.target.checked)}
+                      className="h-4 w-4 rounded border-border accent-primary"
+                    />
+                    <label htmlFor="isRecurring" className="text-sm font-medium cursor-pointer select-none flex items-center gap-1.5">
+                      <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" /> Recurring project
+                    </label>
+                  </div>
+                </FormItem>
+              )} />
+              {form.watch("isRecurring") && (
+                <FormField control={form.control} name="recurringInterval" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Repeat interval</FormLabel>
+                    <Select value={field.value ?? "monthly"} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger data-testid="select-project-interval"><SelectValue placeholder="Select interval…" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {INTERVALS.map(i => <SelectItem key={i} value={i} className="capitalize">{i}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </FormItem>

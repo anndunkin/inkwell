@@ -8,6 +8,7 @@ import type {
   InsertIdea,
   InsertProject,
   InsertDeadline,
+  InsertPublicationHistory,
 } from "../shared/schema";
 
 // ---- Crash logging ----
@@ -284,6 +285,12 @@ function registerIpc() {
     requireDb().setSetting(key, value);
     setDirty(true);
   });
+
+  // Publication history
+  ipcMain.handle("pubHistory:getAll", () => requireDb().getAllPublicationHistory());
+  ipcMain.handle("pubHistory:create", (_e, data: InsertPublicationHistory) => dirtyAfter(requireDb().createPublicationHistory(data)));
+  ipcMain.handle("pubHistory:update", (_e, id: number, data: Partial<InsertPublicationHistory>) => dirtyAfter(requireDb().updatePublicationHistory(id, data)));
+  ipcMain.handle("pubHistory:delete", (_e, id: number) => dirtyAfter(requireDb().deletePublicationHistory(id)));
 }
 
 function createWindow() {

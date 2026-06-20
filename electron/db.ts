@@ -40,8 +40,8 @@ function loadDatabase(): typeof BetterSqlite3 {
 const Database = loadDatabase() as unknown as typeof BetterSqlite3;
 
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { eq } from "drizzle-orm";
-import { ideas, projects, deadlines } from "../shared/schema";
+import { eq, desc } from "drizzle-orm";
+import { ideas, projects, deadlines, publicationHistory } from "../shared/schema";
 import type {
   Idea,
   InsertIdea,
@@ -49,6 +49,8 @@ import type {
   InsertProject,
   Deadline,
   InsertDeadline,
+  PublicationHistory,
+  InsertPublicationHistory,
 } from "../shared/schema";
 
 const SCHEMA_SQL = `
@@ -71,6 +73,18 @@ const SCHEMA_SQL = `
     status TEXT NOT NULL DEFAULT 'active',
     idea_id INTEGER,
     publication TEXT,
+    is_recurring INTEGER NOT NULL DEFAULT 0,
+    recurring_interval TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT ''
+  );
+
+  CREATE TABLE IF NOT EXISTS publication_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    publication TEXT NOT NULL,
+    project_id INTEGER,
+    project_title TEXT NOT NULL DEFAULT '',
+    published_date TEXT NOT NULL,
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT ''
   );
@@ -107,11 +121,22 @@ export class InkwellDB {
     this.sqlite.exec(SCHEMA_SQL);
     this.db = drizzle(this.sqlite);
 
-    // Migrate existing databases: add publication column if missing.
-    try {
-      this.sqlite.exec("ALTER TABLE projects ADD COLUMN publication TEXT");
-    } catch {
-      // Column already exists — safe to ignore.
+    // Migrate existing databases: add new columns if missing.
+    const migrations: string[] = [
+      "ALTER TABLE projects ADD COLUMN publication TEXT",
+      "ALTER TABLE projects ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE projects ADD COLUMN recurring_interval TEXT",
+    ];
+    for (const sql of migrations) {
+      try { this.sqlite.exec(sql); } catch { /* column already exists */ }
+    }
+
+    // Seed CIO News history if this is a fresh file (no history rows yet).
+    const histCount = (this.sqlite.prepare("SELECT COUNT(*) as c FROM publication_history").get() as { c: number }).c;
+    if (histCount === 0) {
+      this.sqlite.prepare(
+        "INSERT INTO publication_history (publication, project_title, published_date, created_at) VALUES (?, ?, ?, ?)"
+      ).run("CIO News", "Previous article", "2026-05-15", new Date().toISOString());
     }
 
     // Initialize default settings for new files.
@@ -169,6 +194,23 @@ export class InkwellDB {
   }
   deleteProject(id: number): boolean {
     return this.db.delete(projects).where(eq(projects.id, id)).run().changes > 0;
+  }
+
+  // ---- Publication History ----
+  getAllPublicationHistory(): PublicationHistory[] {
+    return this.db.select().from(publicationHistory)
+      .orderBy(desc(publicationHistory.publishedDate))
+      .all();
+  }
+  createPublicationHistory(data: InsertPublicationHistory): PublicationHistory {
+    const createdAt = new Date().toISOString();
+    return this.db.insert(publicationHistory).values({ ...data, createdAt }).returning().get();
+  }
+  updatePublicationHistory(id: number, data: Partial<InsertPublicationHistory>): PublicationHistory | undefined {
+    return this.db.update(publicationHistory).set(data).where(eq(publicationHistory.id, id)).returning().get();
+  }
+  deletePublicationHistory(id: number): boolean {
+    return this.db.delete(publicationHistory).where(eq(publicationHistory.id, id)).run().changes > 0;
   }
 
   // ---- Deadlines ----

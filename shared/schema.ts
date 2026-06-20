@@ -27,9 +27,26 @@ export const projects = sqliteTable("projects", {
   status: text("status").notNull().default("active"), // active, on-hold, completed, cancelled
   ideaId: integer("idea_id"), // optional link to an idea
   publication: text("publication"), // target publication outlet
+  isRecurring: integer("is_recurring", { mode: "boolean" }).notNull().default(false),
+  recurringInterval: text("recurring_interval"), // weekly, biweekly, monthly, quarterly, annual
   notes: text("notes"),
   createdAt: text("created_at").notNull().default(""),
 });
+
+// Publication history — each time a piece was submitted/published to an outlet
+export const publicationHistory = sqliteTable("publication_history", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  publication: text("publication").notNull(),
+  projectId: integer("project_id"), // optional link to a project
+  projectTitle: text("project_title").notNull().default(""), // snapshot title in case project is deleted
+  publishedDate: text("published_date").notNull(), // YYYY-MM-DD
+  notes: text("notes"),
+  createdAt: text("created_at").notNull().default(""),
+});
+
+export const insertPublicationHistorySchema = createInsertSchema(publicationHistory).omit({ id: true });
+export type InsertPublicationHistory = z.infer<typeof insertPublicationHistorySchema>;
+export type PublicationHistory = typeof publicationHistory.$inferSelect;
 
 // User-editable settings stored as JSON strings
 export const settings = sqliteTable("settings", {
