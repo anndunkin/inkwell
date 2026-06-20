@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { InkwellDB } from "./db";
 import { FileSession } from "./fileOps";
@@ -10,13 +10,42 @@ import type {
   InsertDeadline,
 } from "../shared/schema";
 
+// ---- Crash logging ----
+// Write errors to a log file on disk so we can diagnose silent failures
+// in production where there is no visible console.
+function getLogPath(): string {
+  // app.getPath('userData') is available before app.whenReady on most platforms.
+  // Fall back to the temp dir if it isn't.
+  try {
+    return path.join(app.getPath("userData"), "inkwell-crash.log");
+  } catch {
+    return path.join(require("os").tmpdir(), "inkwell-crash.log");
+  }
+}
+
+function writeLog(label: string, err: unknown): void {
+  const msg = (err instanceof Error ? err.stack : String(err)) ?? String(err);
+  const line = `[${new Date().toISOString()}] ${label}\n${msg}\n\n`;
+  try { appendFileSync(getLogPath(), line); } catch { /* non-fatal */ }
+}
+
 // Surface unhandled errors as a visible dialog rather than a silent quit.
-// This is especially important in production where there is no DevTools console.
 process.on("uncaughtException", (err) => {
-  // Try to show a dialog; fall back to stderr if the app isn't ready yet.
-  const msg = err?.stack ?? String(err);
+  writeLog("uncaughtException", err);
+  const msg = (err instanceof Error ? err.stack : String(err)) ?? String(err);
   if (app.isReady()) {
     dialog.showErrorBox("Inkwell — Unexpected Error", msg);
+  } else {
+    process.stderr.write(msg + "\n");
+  }
+  app.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  writeLog("unhandledRejection", reason);
+  const msg = (reason instanceof Error ? reason.stack : String(reason)) ?? String(reason);
+  if (app.isReady()) {
+    dialog.showErrorBox("Inkwell — Unhandled Promise Rejection", msg);
   } else {
     process.stderr.write(msg + "\n");
   }
@@ -304,14 +333,39 @@ async function handleCloseRequest() {
 }
 
 app.whenReady().then(() => {
-  openInitialDatabase();
-  registerIpc();
+  writeLog("startup", "app.whenReady fired");
+  try {
+    openInitialDatabase();
+    writeLog("startup", "openInitialDatabase OK");
+  } catch (err) {
+    writeLog("startup:openInitialDatabase FAILED", err);
+    dialog.showErrorBox("Inkwell — Startup Error", String(err instanceof Error ? err.stack : err));
+    app.exit(1);
+    return;
+  }
+  try {
+    registerIpc();
+    writeLog("startup", "registerIpc OK");
+  } catch (err) {
+    writeLog("startup:registerIpc FAILED", err);
+    dialog.showErrorBox("Inkwell — Startup Error", String(err instanceof Error ? err.stack : err));
+    app.exit(1);
+    return;
+  }
   refreshMenu();
+  writeLog("startup", "refreshMenu OK");
   createWindow();
+  writeLog("startup", "createWindow OK");
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+}).catch((err) => {
+  writeLog("whenReady.catch", err);
+  try {
+    dialog.showErrorBox("Inkwell — Fatal Error", String(err instanceof Error ? err.stack : err));
+  } catch { /* dialog may not be available */ }
+  app.exit(1);
 });
 
 app.on("window-all-closed", () => {
