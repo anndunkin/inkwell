@@ -126,7 +126,7 @@
       "target": [
         "dmg"
       ],
-      "icon": "assets/icon.icns",
+      "icon": "assets/icon.png",
       "category": "public.app-category.productivity"
     },
     "nsis": {
@@ -148,6 +148,14 @@
           "path": "/Applications"
         }
       ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "tar.gz"
+      ],
+      "icon": "assets/icon.png",
+      "category": "Utility"
     }
   }
 }
