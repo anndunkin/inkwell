@@ -4,7 +4,7 @@ import { queryClient } from "@/lib/queryClient";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
 import {
-  BookOpen, Plus, Pencil, Trash2, Clock, RefreshCw, ChevronDown, ChevronUp, CalendarDays,
+  BookOpen, Plus, Pencil, Trash2, Clock, RefreshCw, ChevronDown, ChevronUp, CalendarDays, StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { PublicationHistory, Project } from "@shared/schema";
+import type { PublicationHistory, Project, PublicationNote } from "@shared/schema";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -194,18 +194,64 @@ function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
   );
 }
 
+// ---- PublicationNotesSection ------------------------------------------------
+
+function PublicationNotesSection({ name, savedNotes }: { name: string; savedNotes: string }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(savedNotes);
+
+  const upsertMutation = useMutation({
+    mutationFn: (notes: string) => ipc().pubNotes.upsert(name, notes),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pubNotes"] }),
+  });
+
+  function handleBlur() {
+    if (value !== savedNotes) upsertMutation.mutate(value);
+  }
+
+  return (
+    <div className="border-t border-border">
+      <button
+        data-testid={`button-toggle-pub-notes-${name}`}
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-6 py-2 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+      >
+        <span className="flex items-center gap-1.5">
+          <StickyNote className="w-3.5 h-3.5" />
+          Notes{savedNotes ? "" : <span className="text-muted-foreground/60"> (empty)</span>}
+        </span>
+        {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      </button>
+      {open && (
+        <div className="px-6 pb-4">
+          <Textarea
+            data-testid={`textarea-pub-notes-${name}`}
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            onBlur={handleBlur}
+            rows={3}
+            className="resize-y min-h-[4.5rem] text-sm"
+            placeholder="Add contacts, submission guidelines, rates..."
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---- PublicationCard --------------------------------------------------------
 
 interface PubCardProps {
   name: string;
   entries: PublicationHistory[];
   recurringProjects: Project[];
+  savedNotes: string;
   onLog: (pub: string) => void;
   onEdit: (entry: PublicationHistory) => void;
   onDelete: (id: number) => void;
 }
 
-function PublicationCard({ name, entries, recurringProjects, onLog, onEdit, onDelete }: PubCardProps) {
+function PublicationCard({ name, entries, recurringProjects, savedNotes, onLog, onEdit, onDelete }: PubCardProps) {
   const [expanded, setExpanded] = useState(false);
   const latest = entries[0]; // already sorted desc by date
   const dayCount = latest ? daysSince(latest.publishedDate) : null;
@@ -303,6 +349,8 @@ function PublicationCard({ name, entries, recurringProjects, onLog, onEdit, onDe
           )}
         </div>
       )}
+
+      <PublicationNotesSection key={`${name}:${savedNotes}`} name={name} savedNotes={savedNotes} />
     </Card>
   );
 }
@@ -325,6 +373,12 @@ export default function PublicationsPage() {
     queryFn: () => ipc().settings.get("publications"),
   });
   const publications = parseList(pubsRaw, []);
+  const { data: pubNotes = [] } = useQuery<PublicationNote[]>({
+    queryKey: ["pubNotes"],
+    queryFn: () => ipc().pubNotes.getAll(),
+  });
+  const notesByPub: Record<string, string> = {};
+  for (const n of pubNotes) notesByPub[n.publicationName] = n.notes;
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => ipc().pubHistory.delete(id),
@@ -398,6 +452,7 @@ export default function PublicationsPage() {
               name={pub}
               entries={byPub[pub] ?? []}
               recurringProjects={recurringProjects}
+              savedNotes={notesByPub[pub] ?? ""}
               onLog={openLog}
               onEdit={openEdit}
               onDelete={(id) => deleteMutation.mutate(id)}

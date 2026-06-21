@@ -299,6 +299,10 @@ function registerIpc() {
   ipcMain.handle("pubHistory:create", (_e, data: InsertPublicationHistory) => dirtyAfter(requireDb().createPublicationHistory(data)));
   ipcMain.handle("pubHistory:update", (_e, id: number, data: Partial<InsertPublicationHistory>) => dirtyAfter(requireDb().updatePublicationHistory(id, data)));
   ipcMain.handle("pubHistory:delete", (_e, id: number) => dirtyAfter(requireDb().deletePublicationHistory(id)));
+
+  // Publication notes
+  ipcMain.handle("pubNotes:getAll", () => requireDb().getAllPublicationNotes());
+  ipcMain.handle("pubNotes:upsert", (_e, name: string, notes: string) => dirtyAfter(requireDb().upsertPublicationNote(name, notes)));
 }
 
 function createWindow() {

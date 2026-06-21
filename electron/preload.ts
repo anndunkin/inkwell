@@ -10,6 +10,7 @@ import type {
   InsertPublicationHistory,
   Milestone,
   InsertMilestone,
+  PublicationNote,
 } from "../shared/schema";
 
 export interface FileResult {
@@ -57,6 +58,10 @@ export interface InkwellApi {
     create: (data: InsertPublicationHistory) => Promise<PublicationHistory>;
     update: (id: number, data: Partial<InsertPublicationHistory>) => Promise<PublicationHistory>;
     delete: (id: number) => Promise<boolean>;
+  };
+  pubNotes: {
+    getAll: () => Promise<PublicationNote[]>;
+    upsert: (name: string, notes: string) => Promise<PublicationNote>;
   };
   settings: {
     get: (key: string) => Promise<string | null>;
@@ -106,6 +111,10 @@ const api: InkwellApi = {
     create: (data) => ipcRenderer.invoke("pubHistory:create", data),
     update: (id, data) => ipcRenderer.invoke("pubHistory:update", id, data),
     delete: (id) => ipcRenderer.invoke("pubHistory:delete", id),
+  },
+  pubNotes: {
+    getAll: () => ipcRenderer.invoke("pubNotes:getAll"),
+    upsert: (name, notes) => ipcRenderer.invoke("pubNotes:upsert", name, notes),
   },
   settings: {
     get: (key) => ipcRenderer.invoke("settings:get", key),

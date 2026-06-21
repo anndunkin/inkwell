@@ -89,3 +89,17 @@ export const deadlines = sqliteTable("deadlines", {
 export const insertDeadlineSchema = createInsertSchema(deadlines).omit({ id: true });
 export type InsertDeadline = z.infer<typeof insertDeadlineSchema>;
 export type Deadline = typeof deadlines.$inferSelect;
+
+// Per-publication freeform notes (editor contacts, submission guidelines, rates).
+// Publications themselves are stored as a JSON array in settings; this table
+// holds metadata keyed by the publication name.
+export const publicationNotes = sqliteTable("publication_notes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  publicationName: text("publication_name").notNull().unique(),
+  notes: text("notes").notNull().default(""),
+  updatedAt: text("updated_at").notNull().default(""),
+});
+
+export const insertPublicationNoteSchema = createInsertSchema(publicationNotes).omit({ id: true });
+export type InsertPublicationNote = z.infer<typeof insertPublicationNoteSchema>;
+export type PublicationNote = typeof publicationNotes.$inferSelect;

@@ -41,7 +41,7 @@ const Database = loadDatabase() as unknown as typeof BetterSqlite3;
 
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { eq, desc } from "drizzle-orm";
-import { ideas, projects, deadlines, publicationHistory, milestones } from "../shared/schema";
+import { ideas, projects, deadlines, publicationHistory, milestones, publicationNotes } from "../shared/schema";
 import type {
   Idea,
   InsertIdea,
@@ -53,6 +53,7 @@ import type {
   InsertPublicationHistory,
   Milestone,
   InsertMilestone,
+  PublicationNote,
 } from "../shared/schema";
 
 const SCHEMA_SQL = `
@@ -117,6 +118,13 @@ const SCHEMA_SQL = `
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT ''
   );
+
+  CREATE TABLE IF NOT EXISTS publication_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    publication_name TEXT NOT NULL UNIQUE,
+    notes TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT ''
+  );
 `;
 
 /**
@@ -139,6 +147,12 @@ export class InkwellDB {
       "ALTER TABLE projects ADD COLUMN publication TEXT",
       "ALTER TABLE projects ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE projects ADD COLUMN recurring_interval TEXT",
+      `CREATE TABLE IF NOT EXISTS publication_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        publication_name TEXT NOT NULL UNIQUE,
+        notes TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )`,
     ];
     for (const sql of migrations) {
       try { this.sqlite.exec(sql); } catch { /* column already exists */ }
@@ -277,5 +291,21 @@ export class InkwellDB {
   }
   deleteDeadline(id: number): boolean {
     return this.db.delete(deadlines).where(eq(deadlines.id, id)).run().changes > 0;
+  }
+
+  // ---- Publication Notes ----
+  getAllPublicationNotes(): PublicationNote[] {
+    return this.db.select().from(publicationNotes).all();
+  }
+
+  upsertPublicationNote(publicationName: string, notes: string): PublicationNote {
+    const updatedAt = new Date().toISOString();
+    this.sqlite.prepare(
+      `INSERT INTO publication_notes (publication_name, notes, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(publication_name) DO UPDATE SET notes = excluded.notes, updated_at = excluded.updated_at`
+    ).run(publicationName, notes, updatedAt);
+    return this.db.select().from(publicationNotes)
+      .where(eq(publicationNotes.publicationName, publicationName)).get()!;
   }
 }

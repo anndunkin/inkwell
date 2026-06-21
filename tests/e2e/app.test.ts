@@ -69,6 +69,25 @@ test("create a deadline and see it listed", async () => {
   await expect(page.getByText("Final manuscript")).toBeVisible();
 });
 
+test("add notes to a publication card and persist them", async () => {
+  // Navigate via the hash router directly so a lingering dialog overlay from a
+  // prior test cannot intercept a sidebar click.
+  await page.evaluate(() => { window.location.hash = "#/publications"; });
+  const toggle = page.getByTestId("button-toggle-pub-notes-The Atlantic");
+  await toggle.click();
+  const textarea = page.getByTestId("textarea-pub-notes-The Atlantic");
+  await textarea.fill("Editor: jane@example.com — 1200 word max");
+  // Blur to trigger auto-save.
+  await textarea.blur();
+  // Confirm it persisted through the IPC layer.
+  await expect.poll(async () =>
+    page.evaluate(async () => {
+      const notes = await window.inkwell.pubNotes.getAll();
+      return notes.find((n) => n.publicationName === "The Atlantic")?.notes ?? "";
+    })
+  ).toBe("Editor: jane@example.com — 1200 word max");
+});
+
 test("title bar reflects the active file", async () => {
   const title = await app.evaluate(async ({ BrowserWindow }) => {
     return BrowserWindow.getAllWindows()[0]?.getTitle() ?? "";

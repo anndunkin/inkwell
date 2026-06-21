@@ -83,6 +83,22 @@ describe("InkwellDB CRUD", () => {
       expect(db.getAllDeadlines()).toHaveLength(0);
     });
   });
+
+  describe("publication notes", () => {
+    it("upserts notes: inserts then updates the same publication", () => {
+      const inserted = db.upsertPublicationNote("The Atlantic", "Editor: jane@theatlantic.com");
+      expect(inserted.publicationName).toBe("The Atlantic");
+      expect(inserted.notes).toBe("Editor: jane@theatlantic.com");
+      expect(inserted.updatedAt).not.toBe("");
+
+      const updated = db.upsertPublicationNote("The Atlantic", "Pays $1/word, 1500 word max");
+      expect(updated.notes).toBe("Pays $1/word, 1500 word max");
+
+      const all = db.getAllPublicationNotes();
+      expect(all).toHaveLength(1);
+      expect(all[0].notes).toBe("Pays $1/word, 1500 word max");
+    });
+  });
 });
 
 describe("FileSession file operations", () => {
