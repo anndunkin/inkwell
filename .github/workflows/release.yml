@@ -93,5 +93,5 @@ jobs:
           foreach ($rel in $toDelete) {
             Write-Host "Deleting release: $($rel.name) (id=$($rel.id), tag=$($rel.tag_name))"
             gh api --method DELETE repos/${{ github.repository }}/releases/$($rel.id)
-            gh api --method DELETE repos/${{ github.repository }}/git/refs/tags/$($rel.tag_name)
+            gh api --method DELETE repos/${{ github.repository }}/git/refs/tags/$($rel.tag_name) 2>$null; $true
           }
