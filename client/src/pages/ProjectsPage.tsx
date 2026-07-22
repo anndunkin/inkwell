@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Trash2, FolderOpen, BookOpen, RefreshCw } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FolderOpen, BookOpen, RefreshCw, CalendarClock } from "lucide-react";
 import MilestonePipeline from "@/components/MilestonePipeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertProjectSchema, type Project, type InsertProject, type Idea } from "@shared/schema";
+import { insertProjectSchema, type Project, type InsertProject, type Idea, type Deadline } from "@shared/schema";
 import { z } from "zod";
 
 const DEFAULT_PROJECT_TYPES = ["article", "book", "essay", "blog", "speech", "report", "policy", "white paper", "other"];
@@ -37,6 +37,23 @@ function parseList(json: string | null | undefined, fallback: string[]): string[
   try { return JSON.parse(json) as string[]; } catch { return fallback; }
 }
 
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+/** Soonest not-yet-due, not-completed deadline for a project, or null. */
+function nextDeadline(deadlines: Deadline[], projectId: number): Deadline | null {
+  const t = today();
+  const upcoming = deadlines
+    .filter(d => d.projectId === projectId && d.status !== "completed" && d.dueDate > t)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  return upcoming[0] ?? null;
+}
+
 export default function ProjectsPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -47,6 +64,7 @@ export default function ProjectsPage() {
 
   const { data: projects, isLoading } = useQuery<Project[]>({ queryKey: ["/api/projects"] });
   const { data: ideas } = useQuery<Idea[]>({ queryKey: ["/api/ideas"] });
+  const { data: deadlines } = useQuery<Deadline[]>({ queryKey: ["/api/deadlines"] });
   const { data: projectTypesRaw } = useQuery<string | null>({ queryKey: ["/api/settings/projectTypes"], queryFn: () => ipc().settings.get("projectTypes") });
   const { data: publicationsRaw } = useQuery<string | null>({ queryKey: ["/api/settings/publications"], queryFn: () => ipc().settings.get("publications") });
 
@@ -73,6 +91,19 @@ export default function ProjectsPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => ipc().projects.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/projects"] }); toast({ title: "Project deleted" }); },
+  });
+
+  const spawnMutation = useMutation({
+    mutationFn: (projectId: number) => ipc().deadlines.spawnRecurring(projectId),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deadlines"] });
+      if (result) {
+        toast({ title: `Next occurrence scheduled for ${formatDate(result.dueDate)}` });
+      } else {
+        toast({ title: "A future deadline already exists for this project" });
+      }
+    },
+    onError: () => { toast({ title: "Could not schedule the next occurrence", variant: "destructive" }); },
   });
 
   function openNew() {
@@ -173,6 +204,34 @@ export default function ProjectsPage() {
                       </div>
                     )}
                     {p.description && <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{p.description}</p>}
+                    {p.isRecurring && (() => {
+                      const next = nextDeadline(deadlines ?? [], p.id);
+                      return (
+                        <div className="flex items-center justify-between gap-2 mt-1.5" data-testid={`recurring-info-${p.id}`}>
+                          {next ? (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
+                              <CalendarClock className="w-3 h-3 shrink-0" />
+                              <span className="truncate" data-testid={`recurring-next-${p.id}`}>Next due: {formatDate(next.dueDate)}</span>
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500 min-w-0" data-testid={`recurring-none-${p.id}`}>
+                              <CalendarClock className="w-3 h-3 shrink-0" />
+                              <span className="truncate">No upcoming deadline</span>
+                            </span>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-1.5 text-xs gap-1 shrink-0"
+                            onClick={() => spawnMutation.mutate(p.id)}
+                            disabled={spawnMutation.isPending}
+                            data-testid={`button-spawn-next-${p.id}`}
+                          >
+                            <RefreshCw className="w-3 h-3" /> Spawn Next
+                          </Button>
+                        </div>
+                      );
+                    })()}
                     <MilestonePipeline projectId={p.id} projectTitle={p.title} />
                   </div>
                 ))}
