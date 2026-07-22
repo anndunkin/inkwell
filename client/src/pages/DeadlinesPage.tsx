@@ -145,7 +145,7 @@ export default function DeadlinesPage() {
   const createMutation = useMutation({
     mutationFn: (data: InsertDeadline) => ipc().deadlines.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deadlines"] });
+      queryClient.refetchQueries({ queryKey: ["/api/deadlines"] });
       toast({ title: "Deadline added" });
       closeDialog();
     },
@@ -154,7 +154,7 @@ export default function DeadlinesPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InsertDeadline> }) => ipc().deadlines.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deadlines"] });
+      queryClient.refetchQueries({ queryKey: ["/api/deadlines"] });
       toast({ title: "Deadline updated" });
       closeDialog();
     },
@@ -163,7 +163,7 @@ export default function DeadlinesPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => ipc().deadlines.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deadlines"] });
+      queryClient.refetchQueries({ queryKey: ["/api/deadlines"] });
       toast({ title: "Deadline deleted" });
     },
   });
@@ -171,7 +171,7 @@ export default function DeadlinesPage() {
   const completeDeadlineMutation = useMutation({
     mutationFn: (id: number) => ipc().deadlines.update(id, { status: "completed" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deadlines"] });
+      queryClient.refetchQueries({ queryKey: ["/api/deadlines"] });
       toast({ title: "Marked as complete" });
     },
   });
@@ -179,8 +179,8 @@ export default function DeadlinesPage() {
   const completeMilestoneMutation = useMutation({
     mutationFn: (id: number) => ipc().milestones.update(id, { status: "completed", completedAt: new Date().toISOString().slice(0, 10) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/milestones"] }); // per-project cache too
+      queryClient.refetchQueries({ queryKey: ["/api/milestones"] });
+      queryClient.refetchQueries({ queryKey: ["/api/milestones"] }); // per-project cache too
       toast({ title: "Milestone marked complete" });
     },
   });
@@ -188,7 +188,7 @@ export default function DeadlinesPage() {
   const deleteMilestoneMutation = useMutation({
     mutationFn: (id: number) => ipc().milestones.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
+      queryClient.refetchQueries({ queryKey: ["/api/milestones"] });
       toast({ title: "Milestone deleted" });
     },
   });

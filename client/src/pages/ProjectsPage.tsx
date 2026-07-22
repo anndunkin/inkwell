@@ -96,7 +96,7 @@ export default function ProjectsPage() {
   const spawnMutation = useMutation({
     mutationFn: (projectId: number) => ipc().deadlines.spawnRecurring(projectId),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/deadlines"] });
+      queryClient.refetchQueries({ queryKey: ["/api/deadlines"] });
       if (result) {
         toast({ title: `Next occurrence scheduled for ${formatDate(result.dueDate)}` });
       } else {
