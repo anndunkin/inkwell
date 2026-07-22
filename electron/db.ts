@@ -56,6 +56,24 @@ import type {
   PublicationNote,
 } from "../shared/schema";
 
+/**
+ * Add one recurring interval to a YYYY-MM-DD date, returning YYYY-MM-DD.
+ * weekly +7d, biweekly +14d, monthly +1mo, quarterly +3mo, annual/annually +1yr.
+ */
+function addInterval(dateStr: string, interval: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  switch (interval) {
+    case "weekly": d.setDate(d.getDate() + 7); break;
+    case "biweekly": d.setDate(d.getDate() + 14); break;
+    case "monthly": d.setMonth(d.getMonth() + 1); break;
+    case "quarterly": d.setMonth(d.getMonth() + 3); break;
+    case "annual":
+    case "annually": d.setFullYear(d.getFullYear() + 1); break;
+    default: d.setMonth(d.getMonth() + 1); break;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
 const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS ideas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,8 +119,9 @@ const SCHEMA_SQL = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL,
     name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
+    status TEXT NOT NULL DEFAULT 'not_started',
     due_date TEXT,
+    completed_at TEXT,
     notes TEXT,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT ''
@@ -147,6 +166,7 @@ export class InkwellDB {
       "ALTER TABLE projects ADD COLUMN publication TEXT",
       "ALTER TABLE projects ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE projects ADD COLUMN recurring_interval TEXT",
+      "ALTER TABLE milestones ADD COLUMN completed_at TEXT",
       `CREATE TABLE IF NOT EXISTS publication_notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         publication_name TEXT NOT NULL UNIQUE,
@@ -291,6 +311,41 @@ export class InkwellDB {
   }
   deleteDeadline(id: number): boolean {
     return this.db.delete(deadlines).where(eq(deadlines.id, id)).run().changes > 0;
+  }
+
+  /**
+   * For a recurring project with a past-due latest deadline and no upcoming one,
+   * generate the next occurrence (latest date + interval, rolled forward past
+   * today). Returns the new deadline, or null if nothing was spawned.
+   */
+  spawnNextRecurringDeadline(projectId: number): Deadline | null {
+    const project = this.getProject(projectId);
+    if (!project || !project.isRecurring || !project.recurringInterval) return null;
+
+    const projectDeadlines = this.db.select().from(deadlines)
+      .where(eq(deadlines.projectId, projectId)).all();
+    if (projectDeadlines.length === 0) return null;
+
+    const today = new Date().toISOString().slice(0, 10);
+    // If a future deadline already exists, there is nothing to schedule.
+    if (projectDeadlines.some(d => d.dueDate > today)) return null;
+
+    const latest = projectDeadlines.reduce((a, b) => (a.dueDate >= b.dueDate ? a : b));
+
+    // Roll forward from the latest date until we land strictly after today,
+    // so a long-dormant project produces a single upcoming deadline.
+    let next = addInterval(latest.dueDate, project.recurringInterval);
+    while (next <= today) next = addInterval(next, project.recurringInterval);
+
+    return this.createDeadline({
+      title: latest.title,
+      projectId,
+      dueDate: next,
+      priority: latest.priority,
+      status: "pending",
+      notes: null,
+      createdAt: "",
+    });
   }
 
   // ---- Publication Notes ----

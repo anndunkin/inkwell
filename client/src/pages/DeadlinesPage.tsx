@@ -54,7 +54,7 @@ interface UnifiedEntry {
 }
 
 function milestoneToStatus(s: string): string {
-  if (s === "complete") return "completed";
+  if (s === "completed") return "completed";
   return "pending";
 }
 
@@ -177,7 +177,7 @@ export default function DeadlinesPage() {
   });
 
   const completeMilestoneMutation = useMutation({
-    mutationFn: (id: number) => ipc().milestones.update(id, { status: "complete" }),
+    mutationFn: (id: number) => ipc().milestones.update(id, { status: "completed", completedAt: new Date().toISOString().slice(0, 10) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
       queryClient.invalidateQueries({ queryKey: ["/api/milestones"] }); // per-project cache too
@@ -319,7 +319,7 @@ export default function DeadlinesPage() {
   ) : null;
 
   const pendingDeadlines = (deadlines ?? []).filter(d => d.status === "pending").length;
-  const pendingMilestones = (allMilestones ?? []).filter(m => m.dueDate && m.status !== "complete").length;
+  const pendingMilestones = (allMilestones ?? []).filter(m => m.dueDate && m.status !== "completed").length;
 
   return (
     <div className="p-6 max-w-4xl mx-auto">

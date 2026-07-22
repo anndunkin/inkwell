@@ -63,8 +63,9 @@ export const milestones = sqliteTable("milestones", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   projectId: integer("project_id").notNull(),
   name: text("name").notNull(), // e.g. "First Draft", "With Editor"
-  status: text("status").notNull().default("pending"), // pending, in-progress, complete
+  status: text("status").notNull().default("not_started"), // not_started, in_progress, completed, blocked
   dueDate: text("due_date"), // YYYY-MM-DD, optional
+  completedAt: text("completed_at"), // YYYY-MM-DD, set when status becomes completed
   notes: text("notes"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: text("created_at").notNull().default(""),

@@ -84,6 +84,49 @@ describe("InkwellDB CRUD", () => {
     });
   });
 
+  describe("milestones", () => {
+    it("creates, orders, updates, and deletes milestones", () => {
+      const project = db.createProject({ title: "Feature", type: "article", status: "active", ideaId: null, createdAt: "" });
+      const a = db.createMilestone({ projectId: project.id, name: "First Draft", status: "not_started", dueDate: null, completedAt: null, notes: null, sortOrder: 0, createdAt: "" });
+      const b = db.createMilestone({ projectId: project.id, name: "With Editor", status: "not_started", dueDate: null, completedAt: null, notes: null, sortOrder: 0, createdAt: "" });
+      expect(b.sortOrder).toBeGreaterThan(a.sortOrder);
+
+      const updated = db.updateMilestone(a.id, { status: "completed", completedAt: "2026-07-22" });
+      expect(updated?.status).toBe("completed");
+      expect(updated?.completedAt).toBe("2026-07-22");
+
+      expect(db.getMilestonesForProject(project.id)).toHaveLength(2);
+      expect(db.deleteMilestone(b.id)).toBe(true);
+      expect(db.getMilestonesForProject(project.id)).toHaveLength(1);
+    });
+  });
+
+  describe("recurring deadlines", () => {
+    it("spawns the next occurrence past today for a recurring project", () => {
+      const project = db.createProject({ title: "Weekly column", type: "article", status: "active", ideaId: null, isRecurring: true, recurringInterval: "weekly", createdAt: "" });
+      db.createDeadline({ title: "Column due", projectId: project.id, dueDate: "2020-01-01", priority: "medium", status: "completed", createdAt: "" });
+
+      const spawned = db.spawnNextRecurringDeadline(project.id);
+      expect(spawned).not.toBeNull();
+      const today = new Date().toISOString().slice(0, 10);
+      expect(spawned!.dueDate > today).toBe(true);
+      expect(spawned!.title).toBe("Column due");
+      expect(spawned!.status).toBe("pending");
+    });
+
+    it("does not spawn when a future deadline already exists", () => {
+      const project = db.createProject({ title: "Monthly", type: "article", status: "active", ideaId: null, isRecurring: true, recurringInterval: "monthly", createdAt: "" });
+      db.createDeadline({ title: "M", projectId: project.id, dueDate: "2999-01-01", priority: "medium", status: "pending", createdAt: "" });
+      expect(db.spawnNextRecurringDeadline(project.id)).toBeNull();
+    });
+
+    it("does not spawn for a non-recurring project", () => {
+      const project = db.createProject({ title: "One-off", type: "article", status: "active", ideaId: null, createdAt: "" });
+      db.createDeadline({ title: "X", projectId: project.id, dueDate: "2020-01-01", priority: "medium", status: "completed", createdAt: "" });
+      expect(db.spawnNextRecurringDeadline(project.id)).toBeNull();
+    });
+  });
+
   describe("publication notes", () => {
     it("upserts notes: inserts then updates the same publication", () => {
       const inserted = db.upsertPublicationNote("The Atlantic", "Editor: jane@theatlantic.com");

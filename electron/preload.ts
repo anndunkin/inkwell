@@ -36,6 +36,7 @@ export interface InkwellApi {
     create: (data: InsertDeadline) => Promise<Deadline>;
     update: (id: number, data: Partial<InsertDeadline>) => Promise<Deadline>;
     delete: (id: number) => Promise<boolean>;
+    spawnRecurring: (projectId: number) => Promise<Deadline | null>;
   };
   file: {
     currentPath: () => Promise<string | null>;
@@ -89,6 +90,7 @@ const api: InkwellApi = {
     create: (data) => ipcRenderer.invoke("deadlines:create", data),
     update: (id, data) => ipcRenderer.invoke("deadlines:update", id, data),
     delete: (id) => ipcRenderer.invoke("deadlines:delete", id),
+    spawnRecurring: (projectId) => ipcRenderer.invoke("deadlines:spawnRecurring", projectId),
   },
   file: {
     currentPath: () => ipcRenderer.invoke("file:currentPath"),

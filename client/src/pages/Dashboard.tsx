@@ -1,10 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Lightbulb, FolderOpen, Calendar, AlertTriangle, ArrowRight } from "lucide-react";
+import { Lightbulb, FolderOpen, Calendar, ArrowRight, Milestone as MilestoneIcon } from "lucide-react";
+import { ipc } from "@/lib/ipc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Idea, Project, Deadline } from "@shared/schema";
+import type { Idea, Project, Deadline, Milestone } from "@shared/schema";
+
+interface UpcomingItem {
+  key: string;
+  kind: "deadline" | "milestone";
+  id: number;
+  title: string;
+  dueDate: string;
+  priority?: string;
+}
 
 function daysUntil(dateStr: string) {
   const due = new Date(dateStr);
@@ -22,17 +32,39 @@ export default function Dashboard() {
   const { data: ideas, isLoading: ideasLoading } = useQuery<Idea[]>({ queryKey: ["/api/ideas"] });
   const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({ queryKey: ["/api/projects"] });
   const { data: deadlines, isLoading: deadlinesLoading } = useQuery<Deadline[]>({ queryKey: ["/api/deadlines"] });
+  const { data: milestones, isLoading: milestonesLoading } = useQuery<Milestone[]>({
+    queryKey: ["/api/milestones"],
+    queryFn: () => ipc().milestones.getAll(),
+  });
 
   const activeProjects = projects?.filter(p => p.status === "active") ?? [];
-  const pendingDeadlines = deadlines?.filter(d => d.status === "pending").sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()) ?? [];
-  const upcomingDeadlines = pendingDeadlines.slice(0, 5);
-  const overdueCount = pendingDeadlines.filter(d => daysUntil(d.dueDate) < 0).length;
+  const projectTitle = Object.fromEntries((projects ?? []).map(p => [p.id, p.title]));
+
+  const pendingDeadlineItems: UpcomingItem[] = (deadlines ?? [])
+    .filter(d => d.status === "pending")
+    .map(d => ({ key: `deadline-${d.id}`, kind: "deadline", id: d.id, title: d.title, dueDate: d.dueDate, priority: d.priority }));
+
+  const pendingMilestoneItems: UpcomingItem[] = (milestones ?? [])
+    .filter(m => !!m.dueDate && m.status !== "completed")
+    .map(m => ({
+      key: `milestone-${m.id}`,
+      kind: "milestone",
+      id: m.id,
+      title: `${projectTitle[m.projectId] ?? "Project"} — ${m.name}`,
+      dueDate: m.dueDate!,
+    }));
+
+  // Merge deadlines and milestones, soonest due date first.
+  const pendingItems = [...pendingDeadlineItems, ...pendingMilestoneItems]
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const upcomingDeadlines = pendingItems.slice(0, 5);
+  const overdueCount = pendingItems.filter(d => daysUntil(d.dueDate) < 0).length;
   const newIdeas = ideas?.filter(i => i.status === "new") ?? [];
 
   const stats = [
     { label: "Writing Ideas", value: ideas?.length ?? 0, sub: `${newIdeas.length} new`, icon: Lightbulb, href: "/ideas", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
     { label: "Active Projects", value: activeProjects.length, sub: `${projects?.length ?? 0} total`, icon: FolderOpen, href: "/projects", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-900/20" },
-    { label: "Upcoming Deadlines", value: pendingDeadlines.length, sub: overdueCount > 0 ? `${overdueCount} overdue` : "all on track", icon: Calendar, href: "/deadlines", color: overdueCount > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400", bg: overdueCount > 0 ? "bg-red-50 dark:bg-red-900/20" : "bg-green-50 dark:bg-green-900/20" },
+    { label: "Upcoming Deadlines", value: pendingItems.length, sub: overdueCount > 0 ? `${overdueCount} overdue` : "all on track", icon: Calendar, href: "/deadlines", color: overdueCount > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400", bg: overdueCount > 0 ? "bg-red-50 dark:bg-red-900/20" : "bg-green-50 dark:bg-green-900/20" },
   ];
 
   return (
@@ -53,7 +85,7 @@ export default function Dashboard() {
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
-                      {ideasLoading || projectsLoading || deadlinesLoading
+                      {ideasLoading || projectsLoading || deadlinesLoading || milestonesLoading
                         ? <Skeleton className="h-8 w-12 mb-1" />
                         : <p className="text-3xl font-semibold text-foreground">{value}</p>
                       }
@@ -82,7 +114,7 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            {deadlinesLoading ? (
+            {deadlinesLoading || milestonesLoading ? (
               <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
             ) : upcomingDeadlines.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">No upcoming deadlines</p>
@@ -93,14 +125,20 @@ export default function Dashboard() {
                   const overdue = days < 0;
                   const urgent = days >= 0 && days <= 3;
                   return (
-                    <div key={d.id} data-testid={`deadline-row-${d.id}`} className={`flex items-center justify-between p-2.5 rounded-md bg-muted/50 ${overdue ? "border-l-4 border-red-400" : urgent ? "border-l-4 border-orange-400" : ""}`}>
+                    <div key={d.key} data-testid={`deadline-row-${d.id}`} className={`flex items-center justify-between p-2.5 rounded-md bg-muted/50 ${overdue ? "border-l-4 border-red-400" : urgent ? "border-l-4 border-orange-400" : ""}`}>
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{d.title}</p>
                         <p className={`text-xs ${overdue ? "text-red-500" : urgent ? "text-orange-500" : "text-muted-foreground"}`}>
                           {overdue ? `${Math.abs(days)}d overdue` : days === 0 ? "Due today" : `${days}d left`} · {formatDate(d.dueDate)}
                         </p>
                       </div>
-                      <Badge variant="outline" className={`text-xs shrink-0 ml-2 priority-${d.priority}`}>{d.priority}</Badge>
+                      {d.kind === "milestone" ? (
+                        <Badge variant="outline" className="text-xs shrink-0 ml-2 gap-1 border-purple-300 text-purple-600 dark:text-purple-400">
+                          <MilestoneIcon className="w-3 h-3" /> milestone
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className={`text-xs shrink-0 ml-2 priority-${d.priority}`}>{d.priority}</Badge>
+                      )}
                     </div>
                   );
                 })}

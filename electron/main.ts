@@ -115,6 +115,20 @@ function openDatabase(filePath: string) {
   updateTitle();
   addRecentFile(filePath);
   refreshMenu();
+  spawnRecurringForActiveDb();
+}
+
+/** Generate any missing next occurrences for all recurring projects. */
+function spawnRecurringForActiveDb() {
+  const db = session.db;
+  if (!db) return;
+  let spawned = false;
+  for (const project of db.getAllProjects()) {
+    if (project.isRecurring && project.recurringInterval) {
+      if (db.spawnNextRecurringDeadline(project.id)) spawned = true;
+    }
+  }
+  if (spawned) setDirty(true);
 }
 
 /** Open the default file on launch, creating it in ~/Documents/Inkwell if needed. */
@@ -268,8 +282,16 @@ function registerIpc() {
   // Deadlines
   ipcMain.handle("deadlines:getAll", () => requireDb().getAllDeadlines());
   ipcMain.handle("deadlines:create", (_e, data: InsertDeadline) => dirtyAfter(requireDb().createDeadline(data)));
-  ipcMain.handle("deadlines:update", (_e, id: number, data: Partial<InsertDeadline>) => dirtyAfter(requireDb().updateDeadline(id, data)));
+  ipcMain.handle("deadlines:update", (_e, id: number, data: Partial<InsertDeadline>) => {
+    const updated = dirtyAfter(requireDb().updateDeadline(id, data));
+    // When a recurring project's deadline is completed, schedule the next one.
+    if (data.status === "completed" && updated?.projectId) {
+      requireDb().spawnNextRecurringDeadline(updated.projectId);
+    }
+    return updated;
+  });
   ipcMain.handle("deadlines:delete", (_e, id: number) => dirtyAfter(requireDb().deleteDeadline(id)));
+  ipcMain.handle("deadlines:spawnRecurring", (_e, projectId: number) => dirtyAfter(requireDb().spawnNextRecurringDeadline(projectId)));
 
   // File operations
   ipcMain.handle("file:currentPath", () => session.currentPath);
