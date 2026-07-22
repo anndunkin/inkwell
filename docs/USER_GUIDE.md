@@ -26,7 +26,9 @@ a `*`).
 The Dashboard gives you an at-a-glance overview:
 - **Writing Ideas** — total ideas and how many are still "new"
 - **Active Projects** — active project count out of your total
-- **Upcoming Deadlines** — pending deadlines, with an overdue warning when relevant
+- **Upcoming Deadlines** — pending deadlines **and** due-dated project milestones,
+  merged into one list sorted soonest-first, with an overdue warning when
+  relevant. Milestone entries are marked with a "milestone" badge.
 - **Upcoming Deadlines / Active Projects / Recent Ideas** panels link straight to
   the matching page.
 
@@ -51,7 +53,36 @@ box and the Status/Type filters to narrow the list. Hover a card to reveal the
 
 Projects appear on a **kanban board** with columns for Active, On Hold, Completed,
 and Cancelled. Toggle between **Kanban** and **List** views with the buttons in the
-toolbar. Hover a card to edit or delete it.
+toolbar. Hover a card to edit or delete it. Deleting a project also removes its
+milestones and deadlines.
+
+A project can have a **type**, a target **publication**, and can be marked
+**recurring** with an interval (weekly, biweekly, monthly, quarterly, annual).
+Recurring projects automatically generate their next deadline once the current one
+passes or is completed — so a weekly column always has its next due date waiting.
+
+### Milestone pipeline
+
+Each project card shows a horizontal **milestone pipeline** — a row of stage chips
+(for example: First Draft → With Editor → Copy Edit → Published). The order follows
+the milestone-name sequence in **Settings**.
+
+- Completed stages are filled in and checked off.
+- The current (first not-yet-completed) stage is highlighted.
+- Upcoming stages are muted.
+
+Click a chip to open the advance dialog: mark the stage **complete** and optionally
+choose the **next milestone** and its due date, which adds that stage to the
+pipeline. Clicking an already-completed chip lets you reopen it. Use the **+**
+button at the end of the row to add a milestone directly.
+
+## Publications
+
+1. Click **Publications** in the sidebar.
+2. Each publication card shows your history with that outlet.
+3. Expand the **notes** section on a card to record editor contacts, submission
+   guidelines, pay rates, or anything else. Notes save automatically when you click
+   away and persist in your `.inkwell` file.
 
 ## Deadlines
 
@@ -62,7 +93,9 @@ toolbar. Hover a card to edit or delete it.
 
 Deadlines are sorted by due date and grouped into **Overdue**, **Due This Week**,
 **Upcoming**, and **Completed / Missed**. Overdue and urgent items are highlighted.
-Click the check-circle to mark a deadline complete.
+Click the check-circle to mark a deadline complete. Completing a deadline that
+belongs to a recurring project automatically schedules the next occurrence.
+Due-dated project milestones also appear here alongside deadlines.
 
 ## Working With Files
 

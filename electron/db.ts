@@ -242,7 +242,14 @@ export class InkwellDB {
     return this.db.update(projects).set(data).where(eq(projects.id, id)).returning().get();
   }
   deleteProject(id: number): boolean {
-    return this.db.delete(projects).where(eq(projects.id, id)).run().changes > 0;
+    // Cascade: remove the project's milestones and deadlines so no orphan rows
+    // remain (there are no FK constraints, so we clean up explicitly).
+    const tx = this.sqlite.transaction((projectId: number) => {
+      this.db.delete(milestones).where(eq(milestones.projectId, projectId)).run();
+      this.db.delete(deadlines).where(eq(deadlines.projectId, projectId)).run();
+      return this.db.delete(projects).where(eq(projects.id, projectId)).run().changes > 0;
+    });
+    return tx(id);
   }
 
   // ---- Publication History ----
