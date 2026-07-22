@@ -65,18 +65,33 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --win --x64 --publish never
 
-      - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Inkwell-windows-installer
-          path: release/*.exe
-          if-no-files-found: error
-        continue-on-error: true
+      - name: Get version
+        id: version
+        shell: pwsh
+        run: |
+          $ver = (Get-Content package.json | ConvertFrom-Json).version
+          "version=$ver" >> $env:GITHUB_OUTPUT
+          $tag = "v$ver-build-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
 
       - name: Attach installer to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest-build
-          name: Latest Build
-          prerelease: true
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Inkwell ${{ steps.version.outputs.version }} (${{ github.run_number }})
+          prerelease: false
           files: release/*.exe
+
+      - name: Prune old releases (keep last 3)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $releases = gh api repos/${{ github.repository }}/releases --paginate | ConvertFrom-Json
+          $sorted = $releases | Sort-Object { [datetime]$_.created_at } -Descending
+          $toDelete = $sorted | Select-Object -Skip 3
+          foreach ($rel in $toDelete) {
+            Write-Host "Deleting release: $($rel.name) (id=$($rel.id), tag=$($rel.tag_name))"
+            gh api --method DELETE repos/${{ github.repository }}/releases/$($rel.id)
+            gh api --method DELETE repos/${{ github.repository }}/git/refs/tags/$($rel.tag_name)
+          }
