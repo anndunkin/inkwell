@@ -109,7 +109,7 @@
   "build": {
     "appId": "com.anndunkin.inkwell",
     "productName": "Inkwell",
-    "copyright": "Copyright © 2026 Ann Dunkin",
+    "copyright": "Copyright \u00a9 2026 Ann Dunkin",
     "buildDependenciesFromSource": false,
     "npmRebuild": false,
     "directories": {
@@ -153,5 +153,9 @@
       "installerHeaderIcon": "assets/icon.ico",
       "deleteAppDataOnUninstall": false
     }
+  },
+  "overrides": {
+    "keyv": "4.5.4",
+    "cacheable-request": "7.0.4"
   }
 }
