@@ -347,7 +347,9 @@ export class InkwellDB {
    */
   spawnNextRecurringDeadline(projectId: number): Deadline | null {
     const project = this.getProject(projectId);
-    if (!project || !project.isRecurring || !project.recurringInterval) return null;
+    if (!project) return null;
+    if (!project.isRecurring) return null;
+    if (!project.recurringInterval) throw new Error('Recurring interval is not set on this project. Edit the project to set a recurrence interval (weekly, monthly, etc.).');
 
     const projectDeadlines = this.db.select().from(deadlines)
       .where(eq(deadlines.projectId, projectId)).all();

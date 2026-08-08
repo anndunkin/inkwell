@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Trash2, FolderOpen, BookOpen, RefreshCw, CalendarClock } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FolderOpen, BookOpen, RefreshCw, CalendarClock, AlertTriangle } from "lucide-react";
 import MilestonePipeline from "@/components/MilestonePipeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,7 +103,10 @@ export default function ProjectsPage() {
         toast({ title: "Could not schedule next occurrence — check that a deadline exists and the project is set to recurring" });
       }
     },
-    onError: () => { toast({ title: "Could not schedule the next occurrence", variant: "destructive" }); },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Could not schedule the next occurrence";
+      toast({ title: msg, variant: "destructive" });
+    },
   });
 
   function openNew() {
@@ -193,7 +196,7 @@ export default function ProjectsPage() {
                     </div>
                     <div className="flex flex-wrap gap-1">
                       <Badge variant="outline" className="text-xs capitalize">{p.type}</Badge>
-                      {p.isRecurring && (
+                      {p.isRecurring && p.recurringInterval && (
                         <Badge variant="secondary" className="text-xs gap-1"><RefreshCw className="w-2.5 h-2.5" />{p.recurringInterval}</Badge>
                       )}
                     </div>
@@ -204,7 +207,12 @@ export default function ProjectsPage() {
                       </div>
                     )}
                     {p.description && <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{p.description}</p>}
-                    {p.isRecurring && (() => {
+                    {p.isRecurring && !p.recurringInterval ? (
+                      <div className="flex items-center gap-1 mt-1.5 text-xs text-amber-600 dark:text-amber-500" data-testid={`recurring-interval-missing-${p.id}`}>
+                        <AlertTriangle className="w-3 h-3 shrink-0" />
+                        <span>Recurring interval not set — edit project to set one</span>
+                      </div>
+                    ) : p.isRecurring && p.recurringInterval && (() => {
                       const next = nextDeadline(deadlines ?? [], p.id);
                       return (
                         <div className="flex items-center justify-between gap-2 mt-1.5" data-testid={`recurring-info-${p.id}`}>
