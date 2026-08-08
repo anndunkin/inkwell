@@ -99,6 +99,20 @@ describe("InkwellDB CRUD", () => {
       expect(db.deleteMilestone(b.id)).toBe(true);
       expect(db.getMilestonesForProject(project.id)).toHaveLength(1);
     });
+
+    it("migrates legacy complete status to completed", () => {
+      const project = db.createProject({ title: "Legacy Feature", type: "article", status: "active", ideaId: null, createdAt: "" });
+      db.sqlite.prepare(
+        `INSERT INTO milestones (project_id, name, status, due_date, completed_at, notes, sort_order, created_at)
+         VALUES (?, ?, 'complete', NULL, NULL, NULL, 0, ?)`
+      ).run(project.id, "Legacy milestone", new Date().toISOString());
+
+      db.runMigrations();
+
+      expect(db.getMilestonesForProject(project.id)).toMatchObject([
+        { name: "Legacy milestone", status: "completed" },
+      ]);
+    });
   });
 
   describe("recurring deadlines", () => {

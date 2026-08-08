@@ -161,22 +161,7 @@ export class InkwellDB {
     this.sqlite.exec(SCHEMA_SQL);
     this.db = drizzle(this.sqlite);
 
-    // Migrate existing databases: add new columns if missing.
-    const migrations: string[] = [
-      "ALTER TABLE projects ADD COLUMN publication TEXT",
-      "ALTER TABLE projects ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0",
-      "ALTER TABLE projects ADD COLUMN recurring_interval TEXT",
-      "ALTER TABLE milestones ADD COLUMN completed_at TEXT",
-      `CREATE TABLE IF NOT EXISTS publication_notes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        publication_name TEXT NOT NULL UNIQUE,
-        notes TEXT NOT NULL DEFAULT '',
-        updated_at TEXT NOT NULL DEFAULT ''
-      )`,
-    ];
-    for (const sql of migrations) {
-      try { this.sqlite.exec(sql); } catch { /* column already exists */ }
-    }
+    this.runMigrations();
 
     // Seed CIO News history if this is a fresh file (no history rows yet).
     const histCount = (this.sqlite.prepare("SELECT COUNT(*) as c FROM publication_history").get() as { c: number }).c;
@@ -193,6 +178,27 @@ export class InkwellDB {
     if (!this.getSetting("projectTypes")) this.setSetting("projectTypes", JSON.stringify(defaultProjectTypes));
     if (!this.getSetting("publications")) this.setSetting("publications", JSON.stringify(defaultPublications));
     if (!this.getSetting("milestoneNames")) this.setSetting("milestoneNames", JSON.stringify(defaultMilestoneNames));
+  }
+
+  /** Run idempotent data and schema migrations whenever a database is opened. */
+  runMigrations(): void {
+    // Migrate existing databases: add new columns if missing.
+    const migrations: string[] = [
+      "ALTER TABLE projects ADD COLUMN publication TEXT",
+      "ALTER TABLE projects ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE projects ADD COLUMN recurring_interval TEXT",
+      "ALTER TABLE milestones ADD COLUMN completed_at TEXT",
+      "UPDATE milestones SET status = 'completed' WHERE status = 'complete'",
+      `CREATE TABLE IF NOT EXISTS publication_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        publication_name TEXT NOT NULL UNIQUE,
+        notes TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )`,
+    ];
+    for (const sql of migrations) {
+      try { this.sqlite.exec(sql); } catch { /* column already exists */ }
+    }
   }
 
   close() {
