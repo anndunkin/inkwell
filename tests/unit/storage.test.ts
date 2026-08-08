@@ -114,7 +114,17 @@ describe("InkwellDB CRUD", () => {
       expect(spawned!.status).toBe("pending");
     });
 
-    it("does not spawn when a future deadline already exists", () => {
+    it("spawns when the only future deadline is completed", () => {
+      const project = db.createProject({ title: "Monthly", type: "article", status: "active", ideaId: null, isRecurring: true, recurringInterval: "monthly", createdAt: "" });
+      db.createDeadline({ title: "M", projectId: project.id, dueDate: "2999-01-01", priority: "medium", status: "completed", createdAt: "" });
+
+      const spawned = db.spawnNextRecurringDeadline(project.id);
+      expect(spawned).not.toBeNull();
+      expect(spawned?.dueDate).toBe("2999-02-01");
+      expect(spawned?.status).toBe("pending");
+    });
+
+    it("does not spawn when a future pending deadline already exists", () => {
       const project = db.createProject({ title: "Monthly", type: "article", status: "active", ideaId: null, isRecurring: true, recurringInterval: "monthly", createdAt: "" });
       db.createDeadline({ title: "M", projectId: project.id, dueDate: "2999-01-01", priority: "medium", status: "pending", createdAt: "" });
       expect(db.spawnNextRecurringDeadline(project.id)).toBeNull();

@@ -219,7 +219,10 @@ export default function MilestonePipeline({ projectId, projectTitle }: { project
   });
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InsertMilestone> }) => ipc().milestones.update(id, data),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      queryClient.refetchQueries({ queryKey: ["/api/deadlines"] });
+    },
   });
 
   const ordered = orderMilestones(list, milestoneNames);

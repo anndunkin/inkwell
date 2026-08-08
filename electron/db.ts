@@ -209,6 +209,20 @@ export class InkwellDB {
     this.sqlite.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
   }
 
+  getSettings(): { milestoneNames: string[] } {
+    const rawMilestoneNames = this.getSetting("milestoneNames");
+    try {
+      const milestoneNames = rawMilestoneNames ? JSON.parse(rawMilestoneNames) : [];
+      return {
+        milestoneNames: Array.isArray(milestoneNames)
+          ? milestoneNames.filter((name): name is string => typeof name === "string")
+          : [],
+      };
+    } catch {
+      return { milestoneNames: [] };
+    }
+  }
+
   // ---- Ideas ----
   getAllIdeas(): Idea[] {
     return this.db.select().from(ideas).all();
@@ -334,8 +348,8 @@ export class InkwellDB {
     if (projectDeadlines.length === 0) return null;
 
     const today = new Date().toISOString().slice(0, 10);
-    // If a future deadline already exists, there is nothing to schedule.
-    if (projectDeadlines.some(d => d.dueDate > today)) return null;
+    // A future pending deadline is already scheduled, so do not add another.
+    if (projectDeadlines.some(d => d.dueDate > today && d.status === "pending")) return null;
 
     const latest = projectDeadlines.reduce((a, b) => (a.dueDate >= b.dueDate ? a : b));
 

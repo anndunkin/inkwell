@@ -313,7 +313,24 @@ function registerIpc() {
   ipcMain.handle("milestones:getAll", () => requireDb().getAllMilestones());
   ipcMain.handle("milestones:getForProject", (_e, projectId: number) => requireDb().getMilestonesForProject(projectId));
   ipcMain.handle("milestones:create", (_e, data: InsertMilestone) => dirtyAfter(requireDb().createMilestone(data)));
-  ipcMain.handle("milestones:update", (_e, id: number, data: Partial<InsertMilestone>) => dirtyAfter(requireDb().updateMilestone(id, data)));
+  ipcMain.handle("milestones:update", (_e, id: number, data: Partial<InsertMilestone>) => {
+    const updated = dirtyAfter(requireDb().updateMilestone(id, data));
+    try {
+      if (data.status === "completed" && updated) {
+        const project = requireDb().getProject(updated.projectId);
+        if (project?.isRecurring) {
+          const settings = requireDb().getSettings();
+          const submittedName = settings.milestoneNames.find(name => name.toLowerCase() === "submitted") ?? "Submitted";
+          if (updated.name.toLowerCase() === submittedName.toLowerCase()) {
+            requireDb().spawnNextRecurringDeadline(project.id);
+          }
+        }
+      }
+    } catch (err) {
+      writeLog("milestones:update recurring spawn failed", err);
+    }
+    return updated;
+  });
   ipcMain.handle("milestones:delete", (_e, id: number) => dirtyAfter(requireDb().deleteMilestone(id)));
 
   // Publication history
