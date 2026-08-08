@@ -352,7 +352,12 @@ export default function ProjectsPage() {
                       type="checkbox"
                       id="isRecurring"
                       checked={!!field.value}
-                      onChange={e => field.onChange(e.target.checked)}
+                      onChange={e => {
+                        field.onChange(e.target.checked);
+                        if (e.target.checked && !form.getValues("recurringInterval")) {
+                          form.setValue("recurringInterval", "monthly");
+                        }
+                      }}
                       className="h-4 w-4 rounded border-border accent-primary"
                     />
                     <label htmlFor="isRecurring" className="text-sm font-medium cursor-pointer select-none flex items-center gap-1.5">
@@ -365,7 +370,7 @@ export default function ProjectsPage() {
                 <FormField control={form.control} name="recurringInterval" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Repeat interval</FormLabel>
-                    <Select value={field.value ?? "monthly"} onValueChange={field.onChange}>
+                    <Select value={field.value ?? "monthly"} onValueChange={v => { field.onChange(v); form.setValue("recurringInterval", v); }}>
                       <FormControl><SelectTrigger data-testid="select-project-interval"><SelectValue placeholder="Select interval…" /></SelectTrigger></FormControl>
                       <SelectContent>
                         {INTERVALS.map(i => <SelectItem key={i} value={i} className="capitalize">{i}</SelectItem>)}
