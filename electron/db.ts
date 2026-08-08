@@ -345,9 +345,21 @@ export class InkwellDB {
 
     const projectDeadlines = this.db.select().from(deadlines)
       .where(eq(deadlines.projectId, projectId)).all();
-    if (projectDeadlines.length === 0) return null;
-
     const today = new Date().toISOString().slice(0, 10);
+    // No existing deadlines — create the first one due one interval from today.
+    if (projectDeadlines.length === 0) {
+      const firstDue = addInterval(today, project.recurringInterval);
+      return this.createDeadline({
+        title: project.title,
+        projectId,
+        dueDate: firstDue,
+        priority: "medium",
+        status: "pending",
+        notes: null,
+        createdAt: "",
+      });
+    }
+
     // A future pending deadline is already scheduled, so do not add another.
     if (projectDeadlines.some(d => d.dueDate > today && d.status === "pending")) return null;
 

@@ -100,7 +100,7 @@ export default function ProjectsPage() {
       if (result) {
         toast({ title: `Next occurrence scheduled for ${formatDate(result.dueDate)}` });
       } else {
-        toast({ title: "A future deadline already exists for this project" });
+        toast({ title: "Could not schedule next occurrence — check that a deadline exists and the project is set to recurring" });
       }
     },
     onError: () => { toast({ title: "Could not schedule the next occurrence", variant: "destructive" }); },

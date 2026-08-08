@@ -102,6 +102,26 @@ describe("InkwellDB CRUD", () => {
   });
 
   describe("recurring deadlines", () => {
+    it("creates the first deadline when a recurring project has none", () => {
+      const project = db.createProject({ title: "Weekly column", type: "article", status: "active", ideaId: null, isRecurring: true, recurringInterval: "weekly", createdAt: "" });
+
+      const spawned = db.spawnNextRecurringDeadline(project.id);
+      const today = new Date().toISOString().slice(0, 10);
+      const expectedDue = new Date(`${today}T00:00:00`);
+      expectedDue.setDate(expectedDue.getDate() + 7);
+
+      expect(spawned).not.toBeNull();
+      expect(spawned).toMatchObject({
+        title: project.title,
+        projectId: project.id,
+        dueDate: expectedDue.toISOString().slice(0, 10),
+        priority: "medium",
+        status: "pending",
+        notes: null,
+      });
+      expect(db.getAllDeadlines()).toHaveLength(1);
+    });
+
     it("spawns the next occurrence past today for a recurring project", () => {
       const project = db.createProject({ title: "Weekly column", type: "article", status: "active", ideaId: null, isRecurring: true, recurringInterval: "weekly", createdAt: "" });
       db.createDeadline({ title: "Column due", projectId: project.id, dueDate: "2020-01-01", priority: "medium", status: "completed", createdAt: "" });
