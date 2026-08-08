@@ -80,17 +80,17 @@ export default function ProjectsPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: InsertProject) => ipc().projects.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/projects"] }); toast({ title: "Project created" }); closeDialog(); },
+    onSuccess: () => { queryClient.refetchQueries({ queryKey: ["/api/projects"] }); toast({ title: "Project created" }); closeDialog(); },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InsertProject> }) => ipc().projects.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/projects"] }); toast({ title: "Project updated" }); closeDialog(); },
+    onSuccess: () => { queryClient.refetchQueries({ queryKey: ["/api/projects"] }); toast({ title: "Project updated" }); closeDialog(); },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => ipc().projects.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/projects"] }); toast({ title: "Project deleted" }); },
+    onSuccess: () => { queryClient.refetchQueries({ queryKey: ["/api/projects"] }); toast({ title: "Project deleted" }); },
   });
 
   const spawnMutation = useMutation({

@@ -44,17 +44,17 @@ export default function IdeasPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: InsertIdea) => ipc().ideas.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/ideas"] }); toast({ title: "Idea saved" }); closeDialog(); },
+    onSuccess: () => { queryClient.refetchQueries({ queryKey: ["/api/ideas"] }); toast({ title: "Idea saved" }); closeDialog(); },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InsertIdea> }) => ipc().ideas.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/ideas"] }); toast({ title: "Idea updated" }); closeDialog(); },
+    onSuccess: () => { queryClient.refetchQueries({ queryKey: ["/api/ideas"] }); toast({ title: "Idea updated" }); closeDialog(); },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => ipc().ideas.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/ideas"] }); toast({ title: "Idea deleted" }); },
+    onSuccess: () => { queryClient.refetchQueries({ queryKey: ["/api/ideas"] }); toast({ title: "Idea deleted" }); },
   });
 
   function openNew() {

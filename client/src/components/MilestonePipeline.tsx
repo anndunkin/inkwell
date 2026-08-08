@@ -209,8 +209,8 @@ export default function MilestonePipeline({ projectId, projectTitle }: { project
   const milestoneNames = parseList(namesRaw, DEFAULT_MILESTONE_NAMES);
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey });
-    queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
+    queryClient.refetchQueries({ queryKey });
+    queryClient.refetchQueries({ queryKey: ["/api/milestones"] });
   }
 
   const createMutation = useMutation({

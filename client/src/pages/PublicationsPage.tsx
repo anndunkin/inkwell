@@ -101,7 +101,7 @@ function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
     mutationFn: (data: Parameters<typeof ipc>["0"] extends never ? never : Parameters<typeof ipc.prototype.pubHistory.create>[0]) =>
       ipc().pubHistory.create(data as never),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pubHistory"] });
+      queryClient.refetchQueries({ queryKey: ["/api/pubHistory"] });
       toast({ title: "Entry logged" });
       onClose();
     },
@@ -110,7 +110,7 @@ function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: never }) => ipc().pubHistory.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pubHistory"] });
+      queryClient.refetchQueries({ queryKey: ["/api/pubHistory"] });
       toast({ title: "Entry updated" });
       onClose();
     },
@@ -202,7 +202,7 @@ function PublicationNotesSection({ name, savedNotes }: { name: string; savedNote
 
   const upsertMutation = useMutation({
     mutationFn: (notes: string) => ipc().pubNotes.upsert(name, notes),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pubNotes"] }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ["pubNotes"] }),
   });
 
   function handleBlur() {
@@ -383,7 +383,7 @@ export default function PublicationsPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => ipc().pubHistory.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pubHistory"] });
+      queryClient.refetchQueries({ queryKey: ["/api/pubHistory"] });
       toast({ title: "Entry deleted" });
     },
   });
