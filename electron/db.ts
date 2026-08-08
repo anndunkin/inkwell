@@ -341,52 +341,100 @@ export class InkwellDB {
   }
 
   /**
-   * For a recurring project with a past-due latest deadline and no upcoming one,
-   * generate the next occurrence (latest date + interval, rolled forward past
-   * today). Returns the new deadline, or null if nothing was spawned.
+   * Create the next project instance for a recurring project. The original
+   * project, including its deadlines and milestones, remains unchanged.
    */
-  spawnNextRecurringDeadline(projectId: number): Deadline | null {
+  spawnNextRecurringDeadline(projectId: number): Project | null {
     const project = this.getProject(projectId);
     if (!project) return null;
     if (!project.isRecurring) return null;
     if (!project.recurringInterval) throw new Error('Recurring interval is not set on this project. Edit the project to set a recurrence interval (weekly, monthly, etc.).');
 
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Get all deadlines for this project to find the latest date.
     const projectDeadlines = this.db.select().from(deadlines)
       .where(eq(deadlines.projectId, projectId)).all();
-    const today = new Date().toISOString().slice(0, 10);
-    // No existing deadlines — create the first one due one interval from today.
-    if (projectDeadlines.length === 0) {
-      const firstDue = addInterval(today, project.recurringInterval);
-      return this.createDeadline({
-        title: project.title,
-        projectId,
-        dueDate: firstDue,
-        priority: "medium",
-        status: "pending",
-        notes: null,
-        createdAt: "",
-      });
+
+    // A sibling with an upcoming pending deadline is the project instance that
+    // was already created for this recurrence, so do not create another.
+    const siblingProjects = this.db.select().from(projects)
+      .where(eq(projects.title, project.title)).all()
+      .filter(p => p.id !== projectId && p.isRecurring && p.publication === project.publication);
+
+    for (const sibling of siblingProjects) {
+      const siblingDeadlines = this.db.select().from(deadlines)
+        .where(eq(deadlines.projectId, sibling.id)).all();
+      if (siblingDeadlines.some(d => d.dueDate > today && d.status === "pending")) {
+        return null;
+      }
     }
 
-    // A future pending deadline is already scheduled, so do not add another.
-    if (projectDeadlines.some(d => d.dueDate > today && d.status === "pending")) return null;
+    // Calculate the next due date from the original project's latest deadline.
+    let nextDue: string;
+    if (projectDeadlines.length === 0) {
+      nextDue = addInterval(today, project.recurringInterval);
+    } else {
+      const latest = projectDeadlines.reduce((a, b) => (a.dueDate >= b.dueDate ? a : b));
+      nextDue = addInterval(latest.dueDate, project.recurringInterval);
+      while (nextDue <= today) nextDue = addInterval(nextDue, project.recurringInterval);
+    }
 
-    const latest = projectDeadlines.reduce((a, b) => (a.dueDate >= b.dueDate ? a : b));
+    // Create an independent active project instance for the next recurrence.
+    const newProject = this.createProject({
+      title: project.title,
+      description: project.description,
+      type: project.type,
+      status: "active",
+      ideaId: null,
+      publication: project.publication,
+      isRecurring: true,
+      recurringInterval: project.recurringInterval,
+      notes: project.notes,
+      createdAt: "",
+    });
 
-    // Roll forward from the latest date until we land strictly after today,
-    // so a long-dormant project produces a single upcoming deadline.
-    let next = addInterval(latest.dueDate, project.recurringInterval);
-    while (next <= today) next = addInterval(next, project.recurringInterval);
-
-    return this.createDeadline({
-      title: latest.title,
-      projectId,
-      dueDate: next,
-      priority: latest.priority,
+    this.createDeadline({
+      title: project.title,
+      projectId: newProject.id,
+      dueDate: nextDue,
+      priority: "medium",
       status: "pending",
       notes: null,
       createdAt: "",
     });
+
+    // Milestones represent a fresh workflow in the new project instance.
+    const originalMilestones = this.getMilestonesForProject(projectId);
+    for (const milestone of originalMilestones) {
+      this.createMilestone({
+        projectId: newProject.id,
+        name: milestone.name,
+        status: "not_started",
+        dueDate: null,
+        notes: null,
+        sortOrder: milestone.sortOrder,
+        createdAt: "",
+      });
+    }
+
+    // Projects without milestones retain the standard workflow from settings.
+    if (originalMilestones.length === 0) {
+      const settings = this.getSettings();
+      settings.milestoneNames.forEach((name, index) => {
+        this.createMilestone({
+          projectId: newProject.id,
+          name,
+          status: "not_started",
+          dueDate: null,
+          notes: null,
+          sortOrder: index + 1,
+          createdAt: "",
+        });
+      });
+    }
+
+    return newProject;
   }
 
   // ---- Publication Notes ----

@@ -118,13 +118,13 @@ function openDatabase(filePath: string) {
   spawnRecurringForActiveDb();
 }
 
-/** Generate any missing next occurrences for all recurring projects. */
+/** Generate any missing next project instances for active recurring projects. */
 function spawnRecurringForActiveDb() {
   const db = session.db;
   if (!db) return;
   let spawned = false;
   for (const project of db.getAllProjects()) {
-    if (project.isRecurring && project.recurringInterval) {
+    if (project.status === "active" && project.isRecurring && project.recurringInterval) {
       if (db.spawnNextRecurringDeadline(project.id)) spawned = true;
     }
   }

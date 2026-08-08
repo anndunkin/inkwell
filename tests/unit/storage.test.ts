@@ -116,8 +116,19 @@ describe("InkwellDB CRUD", () => {
   });
 
   describe("recurring deadlines", () => {
-    it("creates the first deadline when a recurring project has none", () => {
-      const project = db.createProject({ title: "Weekly column", type: "article", status: "active", ideaId: null, isRecurring: true, recurringInterval: "weekly", createdAt: "" });
+    it("creates a separate first project instance and seeds fresh milestones", () => {
+      const project = db.createProject({
+        title: "Weekly column",
+        description: "A weekly energy column",
+        type: "article",
+        status: "active",
+        ideaId: null,
+        publication: "Utility Dive",
+        isRecurring: true,
+        recurringInterval: "weekly",
+        notes: "Use the standard format",
+        createdAt: "",
+      });
 
       const spawned = db.spawnNextRecurringDeadline(project.id);
       const today = new Date().toISOString().slice(0, 10);
@@ -127,41 +138,88 @@ describe("InkwellDB CRUD", () => {
       expect(spawned).not.toBeNull();
       expect(spawned).toMatchObject({
         title: project.title,
-        projectId: project.id,
+        description: project.description,
+        type: project.type,
+        status: "active",
+        publication: project.publication,
+        isRecurring: true,
+        recurringInterval: "weekly",
+        notes: project.notes,
+      });
+      expect(spawned!.id).not.toBe(project.id);
+      expect(db.getAllProjects()).toHaveLength(2);
+      expect(db.getAllDeadlines()).toMatchObject([{
+        title: project.title,
+        projectId: spawned!.id,
         dueDate: expectedDue.toISOString().slice(0, 10),
         priority: "medium",
         status: "pending",
         notes: null,
-      });
-      expect(db.getAllDeadlines()).toHaveLength(1);
+      }]);
+      const seededMilestones = db.getMilestonesForProject(spawned!.id);
+      expect(seededMilestones.map(m => m.name)).toEqual([
+        "First Draft", "Second Draft", "With Editor", "Final Review",
+        "Fact Check", "Copy Edit", "Submitted", "Published",
+      ]);
+      expect(seededMilestones.every(m => m.status === "not_started" && m.dueDate === null && m.completedAt === null)).toBe(true);
     });
 
-    it("spawns the next occurrence past today for a recurring project", () => {
+    it("creates a new instance with a future deadline and copied fresh milestones", () => {
       const project = db.createProject({ title: "Weekly column", type: "article", status: "active", ideaId: null, isRecurring: true, recurringInterval: "weekly", createdAt: "" });
       db.createDeadline({ title: "Column due", projectId: project.id, dueDate: "2020-01-01", priority: "medium", status: "completed", createdAt: "" });
+      const firstDraft = db.createMilestone({ projectId: project.id, name: "First Draft", status: "completed", dueDate: "2020-01-01", completedAt: "2020-01-01", notes: "Original work", sortOrder: 0, createdAt: "" });
+      const submitted = db.createMilestone({ projectId: project.id, name: "Submitted", status: "in_progress", dueDate: "2020-01-02", completedAt: null, notes: "Pending", sortOrder: 0, createdAt: "" });
 
       const spawned = db.spawnNextRecurringDeadline(project.id);
       expect(spawned).not.toBeNull();
       const today = new Date().toISOString().slice(0, 10);
-      expect(spawned!.dueDate > today).toBe(true);
-      expect(spawned!.title).toBe("Column due");
-      expect(spawned!.status).toBe("pending");
+      expect(spawned!.title).toBe(project.title);
+      expect(spawned!.status).toBe("active");
+
+      const spawnedDeadline = db.getAllDeadlines().find(d => d.projectId === spawned!.id);
+      expect(spawnedDeadline).toMatchObject({
+        title: project.title,
+        projectId: spawned!.id,
+        priority: "medium",
+        status: "pending",
+        notes: null,
+      });
+      expect(spawnedDeadline!.dueDate > today).toBe(true);
+
+      expect(db.getMilestonesForProject(spawned!.id)).toMatchObject([
+        { name: "First Draft", status: "not_started", dueDate: null, completedAt: null, notes: null, sortOrder: 1 },
+        { name: "Submitted", status: "not_started", dueDate: null, completedAt: null, notes: null, sortOrder: 2 },
+      ]);
+
+      // The source instance and its completed/in-progress workflow stay intact.
+      expect(db.getAllDeadlines().filter(d => d.projectId === project.id)).toMatchObject([
+        { title: "Column due", dueDate: "2020-01-01", status: "completed" },
+      ]);
+      expect(db.getMilestonesForProject(project.id)).toMatchObject([
+        { id: firstDraft.id, status: "completed", dueDate: "2020-01-01", completedAt: "2020-01-01", notes: "Original work" },
+        { id: submitted.id, status: "in_progress", dueDate: "2020-01-02", completedAt: null, notes: "Pending" },
+      ]);
     });
 
-    it("spawns when the only future deadline is completed", () => {
+    it("uses the latest date even when the only deadline is completed", () => {
       const project = db.createProject({ title: "Monthly", type: "article", status: "active", ideaId: null, isRecurring: true, recurringInterval: "monthly", createdAt: "" });
       db.createDeadline({ title: "M", projectId: project.id, dueDate: "2999-01-01", priority: "medium", status: "completed", createdAt: "" });
 
       const spawned = db.spawnNextRecurringDeadline(project.id);
       expect(spawned).not.toBeNull();
-      expect(spawned?.dueDate).toBe("2999-02-01");
-      expect(spawned?.status).toBe("pending");
+      expect(spawned?.title).toBe("Monthly");
+      expect(db.getAllDeadlines().find(d => d.projectId === spawned?.id)).toMatchObject({
+        dueDate: "2999-02-01",
+        status: "pending",
+      });
     });
 
-    it("does not spawn when a future pending deadline already exists", () => {
-      const project = db.createProject({ title: "Monthly", type: "article", status: "active", ideaId: null, isRecurring: true, recurringInterval: "monthly", createdAt: "" });
-      db.createDeadline({ title: "M", projectId: project.id, dueDate: "2999-01-01", priority: "medium", status: "pending", createdAt: "" });
+    it("does not spawn when a sibling instance already has a future pending deadline", () => {
+      const project = db.createProject({ title: "Monthly", type: "article", status: "active", ideaId: null, publication: "The Atlantic", isRecurring: true, recurringInterval: "monthly", createdAt: "" });
+      const sibling = db.createProject({ title: "Monthly", type: "article", status: "active", ideaId: null, publication: "The Atlantic", isRecurring: true, recurringInterval: "monthly", createdAt: "" });
+      db.createDeadline({ title: "M", projectId: sibling.id, dueDate: "2999-01-01", priority: "medium", status: "pending", createdAt: "" });
       expect(db.spawnNextRecurringDeadline(project.id)).toBeNull();
+      expect(db.getAllProjects()).toHaveLength(2);
     });
 
     it("does not spawn for a non-recurring project", () => {

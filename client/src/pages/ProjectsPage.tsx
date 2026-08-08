@@ -97,8 +97,9 @@ export default function ProjectsPage() {
     mutationFn: (projectId: number) => ipc().deadlines.spawnRecurring(projectId),
     onSuccess: (result) => {
       queryClient.refetchQueries({ queryKey: ["/api/deadlines"] });
+      queryClient.refetchQueries({ queryKey: ["/api/projects"] });
       if (result) {
-        toast({ title: `Next occurrence scheduled for ${formatDate(result.dueDate)}` });
+        toast({ title: "Next instance created and added to your projects" });
       } else {
         toast({ title: "Could not schedule next occurrence — check that a deadline exists and the project is set to recurring" });
       }

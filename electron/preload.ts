@@ -36,7 +36,7 @@ export interface InkwellApi {
     create: (data: InsertDeadline) => Promise<Deadline>;
     update: (id: number, data: Partial<InsertDeadline>) => Promise<Deadline>;
     delete: (id: number) => Promise<boolean>;
-    spawnRecurring: (projectId: number) => Promise<Deadline | null>;
+    spawnRecurring: (projectId: number) => Promise<Project | null>;
   };
   file: {
     currentPath: () => Promise<string | null>;
