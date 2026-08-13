@@ -5,6 +5,29 @@ All notable changes to Inkwell are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.7] — 2026-08-13
+
+### Changed
+- **Full dependency modernization** — upgraded the desktop runtime to Electron
+  43.4.0 and electron-builder 26.15.3; upgraded the renderer to React 19.2.8,
+  Vite 8.2.1, TypeScript 7.0.2, Tailwind CSS 4.3.3, Vitest 4.1.10, and current
+  Radix UI, Drizzle, Playwright, React Query, React Hook Form, Zod, and related
+  application and build tooling releases.
+- **Tailwind integration** now uses the Tailwind CSS 4 Vite plugin, CSS-first
+  theme tokens, and `tw-animate-css`.
+- **Calendar integration** now uses the supported `@daypicker/react` package and
+  its current class-name and chevron-component APIs.
+- **Chart and layout wrappers** now use the Recharts 3 tooltip/legend content
+  types and react-resizable-panels 4 `Group`/`Separator` APIs.
+- Corrected the publication-history mutation typing and the SQLite database type
+  annotation; `npm run check` is now clean.
+
+### Security
+- Retained the `keyv@4.5.4` and `cacheable-request@7.0.4` package-lock security
+  pins through the dependency refresh.
+- Kept `better-sqlite3` on the compatible 12.x line at 12.11.1. Version 13.x is
+  intentionally excluded because it segfaults in the supported sandbox.
+
 ## [1.1.0] — 2026-07-22
 
 ### Added

@@ -1,6 +1,6 @@
 # Inkwell — Writing Tracker
 
-**Version 1.1.0**
+**Version 1.2.7**
 
 Inkwell is a local-first desktop app for writers who want to track ideas from a
 spark all the way to publication. Capture ideas, promote them into projects, walk
@@ -39,7 +39,7 @@ Built with Electron, React, Vite, shadcn/ui, and SQLite (better-sqlite3 + Drizzl
 Inkwell ships as a Windows desktop application.
 
 1. Go to [Releases](https://github.com/anndunkin/inkwell/releases).
-2. Download the latest `Inkwell-Setup-1.1.0.exe`.
+2. Download the latest `Inkwell-Setup-1.2.7.exe`.
 3. Run the installer and launch Inkwell from the Start menu.
 
 ## Using Inkwell
@@ -77,7 +77,7 @@ five most recently opened files appear under **File > Recent Files**.
 ## Development
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 20.19+
 - npm
 
 ### Setup
@@ -126,14 +126,15 @@ cases, path-handling contract, and data-integrity/cascade guarantees — see
 
 ## Tech Stack
 
-- Electron 28+
-- React 18 + Vite + TypeScript
-- shadcn/ui + Tailwind CSS
-- better-sqlite3 + Drizzle ORM
-- Vitest (unit) + Playwright (e2e)
+- Electron 43 + electron-builder 26
+- React 19 + Vite 8 + TypeScript 7
+- shadcn/ui (Radix UI) + Tailwind CSS 4
+- better-sqlite3 12 + Drizzle ORM
+- Vitest 4 (unit) + Playwright (e2e)
 
 ## Version History
 
+- **v1.2.7** (2026-08-13) — Full dependency modernization: Electron 43, React 19, Vite 8, TypeScript 7, Tailwind CSS 4, Vitest 4, current Radix UI/Drizzle/Playwright tooling, and current application dependencies. Updated the DayPicker, Recharts, and resizable-panel integrations for their new APIs; preserved the `keyv@4.5.4` and `cacheable-request@7.0.4` security pins and the safe `better-sqlite3` 12.x line.
 - **v1.1.0** (2026-07-22) — Dashboard Upcoming list now merges deadlines and
   milestone due dates sorted soonest-first; recurring projects auto-spawn their
   next deadline; milestones reworked into a horizontal progress pipeline;
