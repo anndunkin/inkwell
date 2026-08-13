@@ -152,7 +152,7 @@ const SCHEMA_SQL = `
  * file (New/Open/Save As) swaps the instance via `openDatabase`.
  */
 export class InkwellDB {
-  readonly sqlite: Database.Database;
+  readonly sqlite: BetterSqlite3.Database;
   private readonly db: BetterSQLite3Database;
 
   constructor(filename: string) {
