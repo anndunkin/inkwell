@@ -13,7 +13,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { PublicationHistory, Project, PublicationNote } from "@shared/schema";
+import type {
+  InsertPublicationHistory,
+  PublicationHistory,
+  Project,
+  PublicationNote,
+} from "@shared/schema";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -98,8 +103,7 @@ function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: Parameters<typeof ipc>["0"] extends never ? never : Parameters<typeof ipc.prototype.pubHistory.create>[0]) =>
-      ipc().pubHistory.create(data as never),
+    mutationFn: (data: InsertPublicationHistory) => ipc().pubHistory.create(data),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: ["/api/pubHistory"] });
       toast({ title: "Entry logged" });
@@ -108,7 +112,8 @@ function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: never }) => ipc().pubHistory.update(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<InsertPublicationHistory> }) =>
+      ipc().pubHistory.update(id, data),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: ["/api/pubHistory"] });
       toast({ title: "Entry updated" });
@@ -130,9 +135,9 @@ function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
       createdAt: "",
     };
     if (editing) {
-      updateMutation.mutate({ id: editing.id, data: data as never });
+      updateMutation.mutate({ id: editing.id, data });
     } else {
-      createMutation.mutate(data as never);
+      createMutation.mutate(data);
     }
   }
 
