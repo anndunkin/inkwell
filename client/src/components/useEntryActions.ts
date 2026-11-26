@@ -11,9 +11,16 @@ export function useEntryActions() {
   const confirm = useConfirm();
 
   async function complete(e: ScheduleEntry) {
-    if (e.kind === "deadline") await ipc().deadlines.update(e.id, { status: "completed" });
-    else await ipc().milestones.update(e.id, { status: "completed", completedAt: todayStr() });
-    await refreshAll();
+    try {
+      if (e.kind === "deadline") await ipc().deadlines.update(e.id, { status: "completed" });
+      else await ipc().milestones.update(e.id, { status: "completed", completedAt: todayStr() });
+    } catch (err) {
+      toast({ title: "Could not mark complete", description: err instanceof Error ? err.message : String(err), variant: "destructive" });
+      return;
+    } finally {
+      // Always re-read so every page reflects what was actually saved.
+      await refreshAll();
+    }
     toast({ title: e.kind === "deadline" ? "Deadline completed" : `${e.title} completed` });
   }
 

@@ -9,6 +9,9 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 Phases 2 to 5 of the structure redesign. Opening an older file upgrades it to schema version 2 after making an automatic backup.
 
+### Fixed
+- Completing a deadline on Today or Schedule could leave it showing as open and overdue. For a recurring project whose next occurrence could not be created (for example no recurrence interval set), the completion was saved but the screens were not refreshed. The next-occurrence step can no longer fail a completion, and the screens now always re-read the saved data. An end-to-end test covers completing items on Today and checking Schedule.
+
 ### Added
 - **Today** page replaces the Dashboard: overdue items, the next 7 days (complete or snooze in place), active projects with no dates, and ideas waiting to be promoted.
 - **Schedule** page replaces Deadlines. Deadlines and dated project stages appear together in an Agenda or a Month calendar, with search and project, priority and completed filters. The same Agenda/Calendar view appears on each project's Dates tab.

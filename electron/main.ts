@@ -313,8 +313,13 @@ function registerIpc() {
   ipcMain.handle("deadlines:update", (_e, id: number, data: Partial<InsertDeadline>) => {
     const updated = dirtyAfter(requireDb().updateDeadline(id, data));
     // When a recurring project's deadline is completed, schedule the next one.
+    // A failure here must not turn an already-saved completion into an error.
     if (data.status === "completed" && updated?.projectId) {
-      requireDb().spawnNextRecurringDeadline(updated.projectId);
+      try {
+        requireDb().spawnNextRecurringDeadline(updated.projectId);
+      } catch (err) {
+        writeLog("deadlines:update recurring spawn failed", err);
+      }
     }
     return updated;
   });
