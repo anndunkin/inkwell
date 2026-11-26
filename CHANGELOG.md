@@ -2,6 +2,10 @@
 
 ## [1.3.1] - 2026-11-26
 
+### Added
+- Build-and-test workflow for pull requests: builds the Windows installer and checks silent install, launch and uninstall. It publishes nothing; releases still come from `v*` tags.
+- End-to-end tests for upgrading a 1.2.x file and for completing items on Today.
+
 ### Fixed
 - Completing a deadline on Today or Schedule could leave it showing as open and overdue. For a recurring project whose next occurrence could not be created (for example no recurrence interval set), the completion was saved but the screens were not refreshed. The next-occurrence step can no longer fail a completion, and the screens now always re-read the saved data. An end-to-end test covers completing items on Today and checking Schedule.
 

@@ -117,7 +117,16 @@ xvfb-run --auto-servernum npm run test:e2e # end-to-end tests (Playwright + Elec
 Unit tests cover the SQLite/Drizzle data layer, recurring-deadline logic, and a
 dedicated **security** suite (SQL-injection resistance, input-validation edge
 cases, path-handling contract, and data-integrity/cascade guarantees — see
-[`docs/SECURITY.md`](docs/SECURITY.md)). E2E tests drive the built Electron app.
+[`docs/SECURITY.md`](docs/SECURITY.md)). E2E tests drive the built Electron app, including upgrading a 1.2.x file (with
+its backup) and completing items on Today and checking Schedule.
+
+Pull requests also run the **Build and test Windows installer** workflow
+(`.github/workflows/build-installer.yml`). It type-checks, runs the E2E suite,
+builds the NSIS installer, silently installs it, launches the installed app to
+confirm the packaged SQLite database opens, and uninstalls it. The installer is
+attached to the run as the `Inkwell-Setup` artifact; the workflow publishes
+nothing. Releases are made separately by pushing a `v*` tag. Not covered:
+upgrading over an installed copy, repair, and code signing.
 
 ## Architecture
 
