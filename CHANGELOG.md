@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.9] - 2026-11-25
+
+Phase 1 of the structure redesign: safety and polish. No data-format changes.
+
+### Added
+- Every delete now asks for confirmation. Deleting a project states how many milestones and deadlines go with it.
+- Always-visible "more actions" menus replace hover-only edit and delete icons on ideas, projects, deadlines and publication history.
+- Dialog footers stay pinned at the bottom so Save and Cancel remain reachable on small windows; long forms scroll.
+- Dashboard greeting follows the time of day.
+
+### Fixed
+- Dates now use the local calendar everywhere. Previously "today" and recurring due dates were computed in UTC, which could be a day ahead in the evening and could shift dates by one day.
+- Milestone chip names are no longer cut off at 12 characters.
+
 ## [1.2.8] - 2026-11-02
 
 ### Security

@@ -6,6 +6,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Search, Pencil, Trash2, Calendar, CheckCircle2, AlertCircle, Milestone as MilestoneIcon,
 } from "lucide-react";
+import RowMenu from "@/components/RowMenu";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { todayStr, daysUntil, formatDate } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -60,21 +63,9 @@ function milestoneToStatus(s: string): string {
 
 // ---- helpers ----------------------------------------------------------------
 
-function daysUntil(dateStr: string) {
-  const due = new Date(dateStr + "T00:00:00");
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return Math.round((due.getTime() - now.getTime()) / 86_400_000);
-}
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
-  });
-}
-
 export default function DeadlinesPage() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("pending");
   const [filterPriority, setFilterPriority] = useState<string>("all");
@@ -177,7 +168,7 @@ export default function DeadlinesPage() {
   });
 
   const completeMilestoneMutation = useMutation({
-    mutationFn: (id: number) => ipc().milestones.update(id, { status: "completed", completedAt: new Date().toISOString().slice(0, 10) }),
+    mutationFn: (id: number) => ipc().milestones.update(id, { status: "completed", completedAt: todayStr() }),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: ["/api/milestones"] });
       queryClient.refetchQueries({ queryKey: ["/api/milestones"] }); // per-project cache too
@@ -195,7 +186,7 @@ export default function DeadlinesPage() {
 
   function openNew() {
     setEditDeadline(null);
-    const today = new Date().toISOString().split("T")[0];
+    const today = todayStr();
     form.reset({ title: "", projectId: null, dueDate: today, priority: "medium", status: "pending", notes: "", createdAt: "" });
     setDialogOpen(true);
   }
@@ -211,6 +202,16 @@ export default function DeadlinesPage() {
   function onSubmit(values: FormValues) {
     if (editDeadline) updateMutation.mutate({ id: editDeadline.id, data: values });
     else createMutation.mutate(values);
+  }
+
+  async function requestDelete(e: UnifiedEntry) {
+    const ok = await confirm({
+      title: `Delete ${e.kind === "milestone" ? "milestone" : "deadline"} "${e.title}"?`,
+      description: e.kind === "milestone" ? "The milestone is removed from its project pipeline." : undefined,
+    });
+    if (!ok) return;
+    if (e.kind === "deadline") deleteMutation.mutate(e.id);
+    else deleteMilestoneMutation.mutate(e.id);
   }
 
   // ---- row renderer --------------------------------------------------------
@@ -283,27 +284,10 @@ export default function DeadlinesPage() {
             </button>
           )}
 
-          <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            {e.kind === "deadline" && (
-              <button
-                onClick={() => openEdit(e.raw as Deadline)}
-                data-testid={`button-edit-deadline-${e.id}`}
-                className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button
-              onClick={() => {
-                if (e.kind === "deadline") deleteMutation.mutate(e.id);
-                else deleteMilestoneMutation.mutate(e.id);
-              }}
-              data-testid={`button-delete-deadline-${e.id}`}
-              className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <RowMenu label={`Actions for ${e.title}`} testId={`menu-deadline-${e.kind}-${e.id}`} items={[
+            ...(e.kind === "deadline" ? [{ label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => openEdit(e.raw as Deadline), testId: `button-edit-deadline-${e.id}` }] : []),
+            { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: e.kind === "deadline", onSelect: () => requestDelete(e), testId: `button-delete-deadline-${e.id}` },
+          ]} />
         </div>
       </div>
     );

@@ -4,6 +4,9 @@ import { queryClient } from "@/lib/queryClient";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, Pencil, Trash2, FolderOpen, BookOpen, RefreshCw, CalendarClock, AlertTriangle } from "lucide-react";
+import RowMenu from "@/components/RowMenu";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { todayStr, formatDate as fmtDate } from "@/lib/dates";
 import MilestonePipeline from "@/components/MilestonePipeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,13 +40,8 @@ function parseList(json: string | null | undefined, fallback: string[]): string[
   try { return JSON.parse(json) as string[]; } catch { return fallback; }
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-}
+const today = todayStr;
+const formatDate = (d: string) => fmtDate(d, "long");
 
 /** Soonest not-yet-due, not-completed deadline for a project, or null. */
 function nextDeadline(deadlines: Deadline[], projectId: number): Deadline | null {
@@ -56,6 +54,7 @@ function nextDeadline(deadlines: Deadline[], projectId: number): Deadline | null
 
 export default function ProjectsPage() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -109,6 +108,16 @@ export default function ProjectsPage() {
       toast({ title: msg, variant: "destructive" });
     },
   });
+
+  async function requestDelete(p: Project) {
+    const [ms, dl] = await Promise.all([ipc().milestones.getForProject(p.id), ipc().deadlines.getAll()]);
+    const deadlineCount = dl.filter(d => d.projectId === p.id).length;
+    const ok = await confirm({
+      title: `Delete "${p.title}"?`,
+      description: `This also deletes its ${ms.length} milestone${ms.length === 1 ? "" : "s"} and ${deadlineCount} deadline${deadlineCount === 1 ? "" : "s"}. This cannot be undone.`,
+    });
+    if (ok) deleteMutation.mutate(p.id);
+  }
 
   function openNew() {
     setEditProject(null);
@@ -190,10 +199,10 @@ export default function ProjectsPage() {
                   <div key={p.id} data-testid={`project-card-${p.id}`} className="group bg-card rounded-md p-3 border border-border shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start gap-1 mb-1.5">
                       <p className="text-sm font-medium leading-snug flex-1">{p.title}</p>
-                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <button onClick={() => openEdit(p)} data-testid={`button-edit-project-${p.id}`} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
-                        <button onClick={() => deleteMutation.mutate(p.id)} data-testid={`button-delete-project-${p.id}`} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
-                      </div>
+                      <RowMenu label={`Actions for ${p.title}`} testId={`menu-project-${p.id}`} items={[
+                        { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => openEdit(p), testId: `button-edit-project-${p.id}` },
+                        { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: true, onSelect: () => requestDelete(p), testId: `button-delete-project-${p.id}` },
+                      ]} />
                     </div>
                     <div className="flex flex-wrap gap-1">
                       <Badge variant="outline" className="text-xs capitalize">{p.type}</Badge>
@@ -268,10 +277,10 @@ export default function ProjectsPage() {
               <div className="flex items-center gap-2 shrink-0 ml-4">
                 <Badge variant="outline" className="text-xs capitalize">{p.type}</Badge>
                 <Badge variant="outline" className={`text-xs status-${p.status}`}>{p.status}</Badge>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEdit(p)} data-testid={`button-edit-project-${p.id}`} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => deleteMutation.mutate(p.id)} data-testid={`button-delete-project-${p.id}`} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
-                </div>
+                <RowMenu label={`Actions for ${p.title}`} testId={`menu-project-${p.id}`} items={[
+                  { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => openEdit(p), testId: `button-edit-project-${p.id}` },
+                  { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: true, onSelect: () => requestDelete(p), testId: `button-delete-project-${p.id}` },
+                ]} />
               </div>
             </div>
           ))}

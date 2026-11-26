@@ -12,11 +12,13 @@ import SettingsPage from "./pages/SettingsPage";
 import PublicationsPage from "./pages/PublicationsPage";
 import NotFound from "./pages/not-found";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { ConfirmProvider } from "./components/ConfirmProvider";
 
 export default function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
+        <ConfirmProvider>
         <Router hook={useHashLocation}>
           <Layout>
             <Switch>
@@ -30,6 +32,7 @@ export default function App() {
             </Switch>
           </Layout>
         </Router>
+        </ConfirmProvider>
         <Toaster />
       </QueryClientProvider>
     </ThemeProvider>

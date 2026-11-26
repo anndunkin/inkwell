@@ -6,6 +6,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   BookOpen, Plus, Pencil, Trash2, Clock, RefreshCw, ChevronDown, ChevronUp, CalendarDays, StickyNote,
 } from "lucide-react";
+import RowMenu from "@/components/RowMenu";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { todayStr, parseDate } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +31,7 @@ function parseList(json: string | null | undefined, fallback: string[]): string[
 }
 
 function daysSince(dateStr: string): number {
-  const d = new Date(dateStr);
+  const d = parseDate(dateStr);
   const now = new Date();
   return Math.floor((now.getTime() - d.getTime()) / 86_400_000);
 }
@@ -85,7 +88,7 @@ function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
   });
   const publications = parseList(pubsRaw, []);
   const { toast } = useToast();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
 
   const [pub, setPub] = useState(editing?.publication ?? "");
   const [projectId, setProjectId] = useState<string>(editing?.projectId ? String(editing.projectId) : "none");
@@ -344,10 +347,10 @@ function PublicationCard({ name, entries, recurringProjects, savedNotes, onLog, 
                     <span className="text-muted-foreground ml-2">{formatDate(entry.publishedDate)}</span>
                     {entry.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate">{entry.notes}</p>}
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                    <button onClick={() => onEdit(entry)} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
-                    <button onClick={() => onDelete(entry.id)} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
-                  </div>
+                  <RowMenu label={`Actions for ${entry.projectTitle || "entry"}`} items={[
+                    { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => onEdit(entry) },
+                    { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: true, onSelect: () => onDelete(entry.id) },
+                  ]} />
                 </div>
               ))}
             </div>
@@ -364,6 +367,7 @@ function PublicationCard({ name, entries, recurringProjects, savedNotes, onLog, 
 
 export default function PublicationsPage() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [logOpen, setLogOpen] = useState(false);
   const [logPub, setLogPub] = useState<string>("");
   const [editing, setEditing] = useState<PublicationHistory | null>(null);
@@ -460,7 +464,11 @@ export default function PublicationsPage() {
               savedNotes={notesByPub[pub] ?? ""}
               onLog={openLog}
               onEdit={openEdit}
-              onDelete={(id) => deleteMutation.mutate(id)}
+              onDelete={async (id) => {
+                const entry = history.find(h => h.id === id);
+                const ok = await confirm({ title: `Delete history entry "${entry?.projectTitle || "Untitled"}"?` });
+                if (ok) deleteMutation.mutate(id);
+              }}
             />
           ))}
         </div>

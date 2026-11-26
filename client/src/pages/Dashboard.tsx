@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Idea, Project, Deadline, Milestone } from "@shared/schema";
+import { daysUntil, formatDate, greeting } from "@/lib/dates";
 
 interface UpcomingItem {
   key: string;
@@ -16,17 +17,6 @@ interface UpcomingItem {
   priority?: string;
 }
 
-function daysUntil(dateStr: string) {
-  const due = new Date(dateStr);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  due.setHours(0, 0, 0, 0);
-  return Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 export default function Dashboard() {
   const { data: ideas, isLoading: ideasLoading } = useQuery<Idea[]>({ queryKey: ["/api/ideas"] });
@@ -71,7 +61,7 @@ export default function Dashboard() {
     <div className="p-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-foreground mb-1">Good evening</h1>
+        <h1 className="text-2xl font-semibold text-foreground mb-1">{greeting()}</h1>
         <p className="text-muted-foreground text-sm">Here's a summary of your writing workspace.</p>
       </div>
 

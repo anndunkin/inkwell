@@ -60,6 +60,11 @@ import type {
  * Add one recurring interval to a YYYY-MM-DD date, returning YYYY-MM-DD.
  * weekly +7d, biweekly +14d, monthly +1mo, quarterly +3mo, annual/annually +1yr.
  */
+/** YYYY-MM-DD in the local time zone (never UTC, so dates do not shift a day). */
+export function localDateStr(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function addInterval(dateStr: string, interval: string): string {
   const d = new Date(dateStr + "T00:00:00");
   switch (interval) {
@@ -71,7 +76,7 @@ function addInterval(dateStr: string, interval: string): string {
     case "annually": d.setFullYear(d.getFullYear() + 1); break;
     default: d.setMonth(d.getMonth() + 1); break;
   }
-  return d.toISOString().slice(0, 10);
+  return localDateStr(d);
 }
 
 const SCHEMA_SQL = `
@@ -350,7 +355,7 @@ export class InkwellDB {
     if (!project.isRecurring) return null;
     if (!project.recurringInterval) throw new Error('Recurring interval is not set on this project. Edit the project to set a recurrence interval (weekly, monthly, etc.).');
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateStr();
 
     // Get all deadlines for this project to find the latest date.
     const projectDeadlines = this.db.select().from(deadlines)

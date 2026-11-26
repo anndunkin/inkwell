@@ -40,15 +40,16 @@ test("create an idea and see it on the Ideas page", async () => {
 test("edit and delete an idea", async () => {
   // Idea card id is dynamic; locate the edit button within the visible card.
   const card = page.locator('[data-testid^="idea-card-"]').filter({ hasText: "Solar policy explainer" }).first();
-  await card.hover();
-  await card.locator('[data-testid^="button-edit-idea-"]').click();
+  await card.locator('[data-testid^="menu-idea-"]').click();
+  await page.locator('[data-testid^="button-edit-idea-"]').click();
   await page.getByTestId("input-idea-title").fill("Solar policy (revised)");
   await page.getByTestId("button-save-idea").click();
   await expect(page.getByText("Solar policy (revised)")).toBeVisible();
 
   const revised = page.locator('[data-testid^="idea-card-"]').filter({ hasText: "Solar policy (revised)" }).first();
-  await revised.hover();
-  await revised.locator('[data-testid^="button-delete-idea-"]').click();
+  await revised.locator('[data-testid^="menu-idea-"]').click();
+  await page.locator('[data-testid^="button-delete-idea-"]').click();
+  await page.getByTestId("confirm-accept").click();
   await expect(page.getByText("Solar policy (revised)")).toHaveCount(0);
 });
 

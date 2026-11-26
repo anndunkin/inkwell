@@ -4,6 +4,7 @@ import { queryClient } from "@/lib/queryClient";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
 import { Check, ChevronRight, Plus } from "lucide-react";
+import { todayStr } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,11 +25,9 @@ function parseList(json: string | null | undefined, fallback: string[]): string[
   try { return JSON.parse(json) as string[]; } catch { return fallback; }
 }
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
+const today = todayStr;
 
-function abbreviate(name: string, max = 12): string {
+function abbreviate(name: string, max = 24): string {
   return name.length > max ? name.slice(0, max - 1) + "…" : name;
 }
 
