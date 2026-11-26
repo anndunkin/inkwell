@@ -1,6 +1,6 @@
 # Inkwell — Writing Tracker
 
-**Version 1.3.0**
+**Version 1.3.1**
 
 Inkwell is a local-first desktop app for writers who want to track ideas from a
 spark all the way to publication. Capture ideas, promote them into projects, walk
@@ -40,7 +40,7 @@ Built with Electron, React, Vite, shadcn/ui, and SQLite (better-sqlite3 + Drizzl
 Inkwell ships as a Windows desktop application.
 
 1. Go to [Releases](https://github.com/anndunkin/inkwell/releases).
-2. Download the latest `Inkwell-Setup-1.3.0.exe`.
+2. Download the latest `Inkwell-Setup-1.3.1.exe`.
 3. Run the installer and launch Inkwell from the Start menu.
 
 ## Using Inkwell
@@ -140,6 +140,8 @@ cases, path-handling contract, and data-integrity/cascade guarantees — see
 
 ## Version History
 
+- **v1.3.1** (2026-11-26) — Fix: completing a recurring project's deadline no longer leaves
+  it showing as open on Today and Schedule.
 - **v1.3.0** (2026-11-25) — Structure redesign: Today and Schedule (agenda and
   calendar), project pages replacing the edit dialog, per-project stage sequences
   and templates, Publications as records, promote and mark-published flows, and a

@@ -1,11 +1,13 @@
 # Changelog
 
-## [1.3.0] - 2026-11-25
-
-Phases 2 to 5 of the structure redesign. Opening an older file upgrades it to schema version 2 after making an automatic backup.
+## [1.3.1] - 2026-11-26
 
 ### Fixed
 - Completing a deadline on Today or Schedule could leave it showing as open and overdue. For a recurring project whose next occurrence could not be created (for example no recurrence interval set), the completion was saved but the screens were not refreshed. The next-occurrence step can no longer fail a completion, and the screens now always re-read the saved data. An end-to-end test covers completing items on Today and checking Schedule.
+
+## [1.3.0] - 2026-11-25
+
+Phases 2 to 5 of the structure redesign. Opening an older file upgrades it to schema version 2 after making an automatic backup.
 
 ### Added
 - **Today** page replaces the Dashboard: overdue items, the next 7 days (complete or snooze in place), active projects with no dates, and ideas waiting to be promoted.
