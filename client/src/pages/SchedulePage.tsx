@@ -24,7 +24,10 @@ export default function SchedulePage() {
     () => buildEntries(deadlines.data ?? [], milestones.data ?? [], projects.data ?? []),
     [deadlines.data, milestones.data, projects.data],
   );
+  // Open items only count when their project is still open, matching Today.
+  const openIds = new Set((projects.data ?? []).filter(p => p.status === "active" || p.status === "on-hold").map(p => p.id));
   const entries = all.filter(e => {
+    if (e.status === "pending" && e.projectId !== null && !openIds.has(e.projectId)) return false;
     if (!showDone && e.status !== "pending") return false;
     if (projectFilter !== "all" && String(e.projectId ?? "none") !== projectFilter) return false;
     if (priority !== "all" && (e.kind !== "deadline" || e.priority !== priority)) return false;

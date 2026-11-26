@@ -8,7 +8,7 @@ export interface ScheduleEntry {
   /** Deadline title, or the milestone (stage) name. */
   title: string;
   dueDate: string;
-  status: "pending" | "completed" | "missed";
+  status: "pending" | "completed" | "missed" | "skipped";
   priority?: string;
   projectId: number | null;
   projectTitle?: string;
@@ -19,7 +19,7 @@ export function buildEntries(deadlines: Deadline[], milestones: Milestone[], pro
   const titles = new Map(projects.map(p => [p.id, p.title]));
   const fromDeadlines: ScheduleEntry[] = deadlines.map(d => ({
     key: `deadline-${d.id}`, kind: "deadline", id: d.id, title: d.title, dueDate: d.dueDate,
-    status: (d.status === "completed" || d.status === "missed" ? d.status : "pending"),
+    status: (d.status === "completed" || d.status === "missed" || d.status === "skipped" ? d.status : "pending"),
     priority: d.priority, projectId: d.projectId ?? null,
     projectTitle: d.projectId ? titles.get(d.projectId) : undefined, raw: d,
   }));

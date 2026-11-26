@@ -52,6 +52,7 @@ export interface InkwellApi {
     update: (id: number, data: Partial<InsertDeadline>) => Promise<Deadline>;
     delete: (id: number) => Promise<boolean>;
     spawnRecurring: (projectId: number) => Promise<Project | null>;
+    skipOccurrence: (projectId: number) => Promise<{ skipped: number; next: Project | null }>;
   };
   file: {
     currentPath: () => Promise<string | null>;
@@ -123,6 +124,7 @@ const api: InkwellApi = {
     update: (id, data) => ipcRenderer.invoke("deadlines:update", id, data),
     delete: (id) => ipcRenderer.invoke("deadlines:delete", id),
     spawnRecurring: (projectId) => ipcRenderer.invoke("deadlines:spawnRecurring", projectId),
+    skipOccurrence: (projectId) => ipcRenderer.invoke("deadlines:skipOccurrence", projectId),
   },
   file: {
     currentPath: () => ipcRenderer.invoke("file:currentPath"),

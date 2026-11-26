@@ -164,6 +164,26 @@ export default function ProjectPage() {
     toast({ title: next ? "Next occurrence scheduled" : "Nothing to schedule yet", description: next ? undefined : "Give this project a due date first." });
   }
 
+  async function skipOccurrence() {
+    const ok = await confirm({
+      title: `Skip this occurrence of "${project!.title}"?`,
+      description: "Its open deadlines are marked skipped, the project is closed as cancelled, and the next occurrence is scheduled. Nothing is deleted.",
+    });
+    if (!ok) return;
+    try {
+      const r = await ipc().deadlines.skipOccurrence(id);
+      toast({
+        title: "Occurrence skipped",
+        description: r.next ? "The next occurrence is scheduled." : "The next occurrence already exists.",
+      });
+      if (r.next) navigate(`/projects/${r.next.id}`);
+    } catch (err) {
+      toast({ title: "Could not skip", description: err instanceof Error ? err.message : String(err), variant: "destructive" });
+    } finally {
+      await refreshAll();
+    }
+  }
+
   const outletValue = project.publicationId ? String(project.publicationId) : "none";
 
   return (
@@ -353,6 +373,7 @@ export default function ProjectPage() {
                   <SelectContent>{INTERVALS.map(i => <SelectItem key={i} value={i} className="capitalize">{i}</SelectItem>)}</SelectContent>
                 </Select>
                 <Button variant="outline" size="sm" onClick={spawnNext} data-testid="button-spawn-next">Schedule next occurrence</Button>
+                <Button variant="outline" size="sm" onClick={skipOccurrence} data-testid="button-skip-occurrence">Skip this occurrence</Button>
               </div>
             )}
           </div>

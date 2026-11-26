@@ -324,6 +324,7 @@ function registerIpc() {
     return updated;
   });
   ipcMain.handle("deadlines:delete", (_e, id: number) => dirtyAfter(requireDb().deleteDeadline(id)));
+  ipcMain.handle("deadlines:skipOccurrence", (_e, projectId: number) => dirtyAfter(requireDb().skipRecurringOccurrence(projectId)));
   ipcMain.handle("deadlines:spawnRecurring", (_e, projectId: number) => dirtyAfter(requireDb().spawnNextRecurringDeadline(projectId)));
 
   // File operations

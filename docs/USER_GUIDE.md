@@ -53,7 +53,10 @@ changes save as you make them (text fields save when you click away).
   logs a publication history entry when an outlet is set.
 - **Overview** — description, the idea it came from, and **Recurring**. For a recurring
   project, completing a deadline or the stage named "Submitted" creates the next
-  occurrence; **Schedule next occurrence** does it on demand.
+  occurrence; **Schedule next occurrence** does it on demand. **Skip this occurrence** asks for
+  confirmation, marks the open deadlines skipped, closes this occurrence as cancelled
+  and schedules the next one. Nothing is deleted. Skipped deadlines appear under
+  "Show completed" on Schedule.
 - **Dates** — this project's deadlines and stage dates as an Agenda or Month calendar,
   with **Add deadline**.
 - **Notes** — free-form notes.

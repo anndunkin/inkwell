@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.2] - 2026-11-26
+
+### Added
+- **Skip this occurrence** on a recurring project's Overview tab. After confirmation, the open deadlines are marked skipped, the occurrence is closed as cancelled, and the next occurrence is scheduled for a date after the skipped one (never in the past). Nothing is deleted. Skipped deadlines show as "Skipped" on Schedule under Show completed. Skipping is refused, changing nothing, if the project is not recurring, has no interval, or has no open deadline.
+
+### Changed
+- Schedule no longer lists open deadlines and stages of projects that are cancelled or completed, matching Today. They remain visible on that project's own Dates tab.
+
+### Testing
+- Four unit tests for skipping and an end-to-end test that skips from the project page.
+
 ## [1.3.1] - 2026-11-26
 
 ### Added
