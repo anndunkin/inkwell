@@ -56,8 +56,9 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "Installer exit code $($p.ExitCode)" }
           if (-not (Test-Path 'C:\InkwellTest\Inkwell.exe')) { throw 'Inkwell.exe was not installed' }
           if (-not (Test-Path 'C:\InkwellTest\Uninstall Inkwell.exe')) { throw 'Uninstaller was not installed' }
-          $key = Get-ChildItem 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall' | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -like 'Inkwell*' }
-          if (-not $key) { throw 'No uninstall registry entry' }
+          $roots = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall','HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall','HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+          $key = foreach ($r in $roots) { if (Test-Path $r) { Get-ChildItem $r | Where-Object { $p = Get-ItemProperty $_.PSPath; $p.DisplayName -like '*Inkwell*' -or $p.InstallLocation -like '*InkwellTest*' -or $p.UninstallString -like '*InkwellTest*' } } }
+          if (-not $key) { Get-ChildItem $roots -ErrorAction SilentlyContinue | ForEach-Object { (Get-ItemProperty $_.PSPath).DisplayName } | Write-Host; throw 'No uninstall registry entry' }
           Write-Host 'Install verified'
 
       - name: Launch installed app and confirm the database opens
