@@ -178,7 +178,7 @@ export default function ProjectPage() {
           <AutoField
             value={project.title} required ariaLabel="Project title" testId="input-project-page-title"
             onSave={v => patch({ title: v.trim() })}
-            className="text-xl font-semibold h-auto py-1.5 px-2 -mx-2 border-transparent hover:border-input focus-visible:border-input shadow-none bg-transparent"
+            className="text-xl md:text-xl font-semibold h-auto py-1.5 px-2 -mx-2 border-transparent hover:border-input focus-visible:border-input shadow-none bg-transparent"
           />
         </div>
         <RowMenu label="Project actions" testId="menu-project-page" items={[
@@ -281,7 +281,7 @@ export default function ProjectPage() {
         )}
 
         {sel && (
-          <div className="mt-3 rounded-lg border bg-card p-4" data-testid="stage-panel">
+          <div className="mt-3 rounded-lg border bg-card p-4" data-testid="panel-stage">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex-1 min-w-0">
                 <AutoField value={sel.name} required ariaLabel="Stage name" testId="input-stage-name" onSave={v => updateStage(sel, { name: v.trim() })} className="font-medium h-9" />

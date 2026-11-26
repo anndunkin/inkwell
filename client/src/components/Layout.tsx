@@ -27,7 +27,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar */}
       <aside className="w-60 shrink-0 flex flex-col border-r border-border bg-sidebar">
         {/* Logo */}
@@ -98,7 +98,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-h-screen overflow-auto flex flex-col">
+      <main className="flex-1 min-w-0 h-screen overflow-hidden flex flex-col">
         <FileStatusBar />
         {notice && (
           <div role="status" data-testid="migration-notice" className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm bg-primary/10 border-b border-border">

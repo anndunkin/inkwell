@@ -3,99 +3,87 @@
 Inkwell helps you capture writing ideas, organize them into projects, and stay
 ahead of your deadlines — all stored in local `.inkwell` files you control.
 
-## Screenshots
-
-> Replace these placeholders with real screenshots after a build.
-
-- Dashboard — `docs/screenshots/dashboard.png`
-- Ideas board — `docs/screenshots/ideas.png`
-- Projects kanban — `docs/screenshots/projects.png`
-- Deadlines tracker — `docs/screenshots/deadlines.png`
-
 ## Getting Started
 
 When you first launch Inkwell, it creates a database at
-`~/Documents/Inkwell/My Writing.inkwell`. All your ideas, projects, and deadlines
-are saved into the currently open `.inkwell` file. The file status bar at the top
-of the window always shows which file you are editing and whether you have unsaved
-changes (an "Unsaved" badge appears next to the filename, and the title bar shows
-a `*`).
+`~/Documents/Inkwell/My Writing.inkwell`. Everything you enter is saved into the
+currently open `.inkwell` file. The file status bar at the top of the window shows
+which file you are editing and whether you have unsaved changes.
 
-## Dashboard
+The sidebar has five places: **Today**, **Ideas**, **Projects**, **Schedule** and
+**Publications**. **Settings** and the dark/light toggle are at the bottom.
 
-The Dashboard gives you an at-a-glance overview:
-- **Writing Ideas** — total ideas and how many are still "new"
-- **Active Projects** — active project count out of your total
-- **Upcoming Deadlines** — pending deadlines **and** due-dated project milestones,
-  merged into one list sorted soonest-first, with an overdue warning when
-  relevant. Milestone entries are marked with a "milestone" badge.
-- **Upcoming Deadlines / Active Projects / Recent Ideas** panels link straight to
-  the matching page.
+## Today
+
+Today shows what needs you now:
+- **Overdue** and **Due in the next 7 days** — deadlines and dated project stages
+  together. Use **Done** to complete an item, or the menu to snooze it one week,
+  open its project or delete it.
+- **Projects with no dates** — active projects with nothing scheduled.
+- **Ideas waiting** — **Promote** turns one into a project and opens it.
 
 ## Ideas
 
-1. Click **Ideas** in the sidebar.
-2. Click **New Idea**.
-3. Fill in a title (required), description, type, status, tags (comma-separated),
-   and notes.
-4. Click **Save Idea**.
-
-Ideas are grouped by status (New, Developing, Parked, Published). Use the search
-box and the Status/Type filters to narrow the list. Hover a card to reveal the
-**edit** (pencil) and **delete** (trash) actions.
+Capture ideas with a title, type, status, tags and notes. Filter by status or type
+and search. **Promote to project** creates a project from the idea (using the
+default stage template), moves the idea to Developing, and opens the project. If
+the idea already has a project, the button becomes **Open project**. The card menu
+has Edit and Delete; deleting asks for confirmation.
 
 ## Projects
 
-1. Click **Projects** in the sidebar.
-2. Click **New Project** and complete the form. Optionally link the project to an
-   existing idea.
-3. Click **Create Project**.
+The Projects page lists your open projects with outlet, current stage with progress,
+next due date and status. Use the filter to see completed or cancelled work, and
+switch to **Board** for status columns.
 
-Projects appear on a **kanban board** with columns for Active, On Hold, Completed,
-and Cancelled. Toggle between **Kanban** and **List** views with the buttons in the
-toolbar. Hover a card to edit or delete it. Deleting a project also removes its
-milestones and deadlines.
+**New project** opens a quick-add row: title, type, outlet and stage template. Create
+takes you to the project page.
 
-A project can have a **type**, a target **publication**, and can be marked
-**recurring** with an interval (weekly, biweekly, monthly, quarterly, annual).
-Recurring projects automatically generate their next deadline once the current one
-passes or is completed — so a weekly column always has its next due date waiting.
+### The project page
 
-### Milestone pipeline
+There is no edit dialog. Change the title, status, type and outlet right on the page;
+changes save as you make them (text fields save when you click away).
 
-Each project card shows a horizontal **milestone pipeline** — a row of stage chips
-(for example: First Draft → With Editor → Copy Edit → Published). The order follows
-the milestone-name sequence in **Settings**.
+- **Stages** — this project's own sequence. Click a stage to set its status, due date
+  and notes, rename it, move it earlier or later, or delete it. **Add a stage** at the
+  bottom. **Add from template** appends any template's missing stages.
+  **Save as template** stores this project's stages as a new template.
+- **Mark published** — when the last stage is complete, a banner offers to mark the
+  project published. That sets the project to Completed, its idea to Published, and
+  logs a publication history entry when an outlet is set.
+- **Overview** — description, the idea it came from, and **Recurring**. For a recurring
+  project, completing a deadline or the stage named "Submitted" creates the next
+  occurrence; **Schedule next occurrence** does it on demand.
+- **Dates** — this project's deadlines and stage dates as an Agenda or Month calendar,
+  with **Add deadline**.
+- **Notes** — free-form notes.
+- **History** — where this project was published or submitted.
 
-- Completed stages are filled in and checked off.
-- The current (first not-yet-completed) stage is highlighted.
-- Upcoming stages are muted.
+Deleting a project (from its menu) states how many stages and deadlines go with it
+and asks for confirmation. Publication history is kept.
 
-Click a chip to open the advance dialog: mark the stage **complete** and optionally
-choose the **next milestone** and its due date, which adds that stage to the
-pipeline. Clicking an already-completed chip lets you reopen it. Use the **+**
-button at the end of the row to add a milestone directly.
+## Schedule
+
+Schedule combines deadlines and dated stages from every project. Switch between
+**Agenda** (Overdue, Due this week, Upcoming, Completed) and **Calendar** (month grid;
+click a day to see its items). Filter by search text, project and priority, and tick
+**Show completed** to include finished items. **New deadline** adds a deadline, which
+you can link to a project.
 
 ## Publications
 
-1. Click **Publications** in the sidebar.
-2. Each publication card shows your history with that outlet.
-3. Expand the **notes** section on a card to record editor contacts, submission
-   guidelines, pay rates, or anything else. Notes save automatically when you click
-   away and persist in your `.inkwell` file.
+Choose an outlet on the left, or add one. On the right: rename it, add a guidelines
+link and rate, and keep notes (editor contacts, pitching tips). You also see open
+projects aimed at the outlet and its history; **Log a piece** records something
+published elsewhere. Deleting an outlet unlinks its projects and keeps history.
 
-## Deadlines
+## Settings
 
-1. Click **Deadlines** in the sidebar.
-2. Click **New Deadline**, set a title and due date, choose a priority, and
-   optionally link a project.
-3. Click **Add Deadline**.
-
-Deadlines are sorted by due date and grouped into **Overdue**, **Due This Week**,
-**Upcoming**, and **Completed / Missed**. Overdue and urgent items are highlighted.
-Click the check-circle to mark a deadline complete. Completing a deadline that
-belongs to a recurring project automatically schedules the next occurrence.
-Due-dated project milestones also appear here alongside deadlines.
+- **Appearance** — light or dark.
+- **Project types** — the list used by the type menus.
+- **Stage templates** — named starting sequences. Create, rename, edit, reorder and
+  delete them, and mark one as the default. Changing a template never alters projects
+  already created from it.
 
 ## Working With Files
 
@@ -106,6 +94,15 @@ Inkwell behaves like a classic desktop document editor:
 - **Save** writes your changes durably and clears the "unsaved" indicator.
 - **Save As...** copies the current data into a new file and switches to it.
 - **Recent Files** lists your five most recently opened files.
+
+### Upgrading from 1.2.x
+
+The first time you open a file made by an older version, Inkwell writes a backup
+named `<file>.pre-v2-backup-<timestamp>.inkwell` in the same folder, then upgrades the
+file and shows a notice. Your outlets become Publications, the old milestone-name list
+becomes the default template "Standard", and each project receives its own copy of the
+stages in the order it showed before. If the backup cannot be written, nothing changes.
+To go back, close Inkwell and open the backup with the older version.
 
 If you try to create/open a new file or close the app while you have unsaved
 changes, Inkwell prompts you to **Save**, **Don't Save**, or **Cancel**.

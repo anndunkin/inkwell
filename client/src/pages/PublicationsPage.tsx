@@ -195,7 +195,7 @@ export default function PublicationsPage() {
               <div className="flex items-start gap-3 mb-4">
                 <div className="flex-1 min-w-0">
                   <AutoField value={selected.name} required ariaLabel="Outlet name" testId="input-publication-name" onSave={v => patch(selected, { name: v.trim() })}
-                    className="text-lg font-semibold h-auto py-1.5 px-2 -mx-2 border-transparent hover:border-input focus-visible:border-input shadow-none bg-transparent" />
+                    className="text-lg md:text-lg font-semibold h-auto py-1.5 px-2 -mx-2 border-transparent hover:border-input focus-visible:border-input shadow-none bg-transparent" />
                 </div>
                 <RowMenu label="Outlet actions" testId="menu-publication" items={[
                   { label: "Delete outlet", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, onSelect: () => remove(selected), testId: "button-delete-publication" },

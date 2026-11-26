@@ -1,6 +1,6 @@
 # Inkwell — Writing Tracker
 
-**Version 1.2.7**
+**Version 1.3.0**
 
 Inkwell is a local-first desktop app for writers who want to track ideas from a
 spark all the way to publication. Capture ideas, promote them into projects, walk
@@ -12,25 +12,26 @@ Built with Electron, React, Vite, shadcn/ui, and SQLite (better-sqlite3 + Drizzl
 
 ## Features
 
-- **Ideas board** — capture writing ideas with status tracking
-  (New → Developing → Parked → Published), categories, tags, and notes.
-- **Projects** — kanban board (Active / On Hold / Completed / Cancelled) with a
-  project **type**, an optional **target publication**, and optional
-  **recurring** scheduling (weekly / biweekly / monthly / quarterly / annual).
-- **Milestone pipeline** — each project shows a horizontal progress pipeline of
-  stage chips (e.g. First Draft → With Editor → Copy Edit → Published). Click a
-  chip to mark it complete and advance to the next stage, optionally setting a due
-  date; completed stages are checked off and the active stage is highlighted.
-- **Deadlines** — priority-based deadline tracker grouped into Overdue, Due This
-  Week, Upcoming, and Completed/Missed. Recurring projects **auto-spawn** their
-  next deadline when the current one passes or is completed.
-- **Publications** — track the outlets you write for, with per-publication
-  freeform **notes** (editor contacts, submission guidelines, rates) and a
-  publication history.
-- **Dashboard** — at-a-glance stats plus an Upcoming list that merges deadlines
-  and due-dated milestones, **sorted soonest-first**.
-- **Settings** — editable lists for project types, publications, and the
-  milestone-name sequence that drives the pipeline order.
+- **Today** — what needs you now: overdue items, the next 7 days (complete or
+  snooze in place), active projects with no dates, and ideas ready to promote.
+- **Ideas** — capture ideas with status tracking (New, Developing, Parked,
+  Published), categories, tags and notes. **Promote** an idea to a project in one
+  click.
+- **Projects** — a list with stage progress and next due date (or a Board view).
+  Each project has its own page: inline-editable title, status, type and outlet,
+  stages, dates, notes, recurrence and publication history. No edit dialog.
+- **Per-project stages** — every project owns its stage sequence. Start from a
+  template, then add, rename, reorder, date or delete stages for that project
+  alone. Save any project's stages as a template.
+- **Schedule** — deadlines and dated project stages together, as an Agenda or a
+  Month calendar. The same view appears on each project's Dates tab. Recurring
+  projects schedule their next occurrence when a deadline or "Submitted" stage is
+  completed.
+- **Publications** — outlets with guidelines link, rate, notes, the projects aimed
+  at them, and a history of pieces. Finishing a project's last stage offers
+  **Mark published**, which records the history entry for you.
+- **Settings** — appearance, project types, and stage templates.
+- **Safe upgrades** — opening a file from an older version makes a backup first.
 - **Native file menu** — New / Open / Save / Save As, plus Recent Files.
 - Dark / light mode.
 
@@ -39,22 +40,18 @@ Built with Electron, React, Vite, shadcn/ui, and SQLite (better-sqlite3 + Drizzl
 Inkwell ships as a Windows desktop application.
 
 1. Go to [Releases](https://github.com/anndunkin/inkwell/releases).
-2. Download the latest `Inkwell-Setup-1.2.7.exe`.
+2. Download the latest `Inkwell-Setup-1.3.0.exe`.
 3. Run the installer and launch Inkwell from the Start menu.
 
 ## Using Inkwell
 
-- **Dashboard** — overview stats and an Upcoming panel that combines deadlines and
-  milestone due dates, sorted by soonest due date.
-- **Ideas** — add ideas with a title, category, status, tags, and notes; filter
-  and search; edit or delete from each card.
-- **Projects** — create projects, optionally link an idea, set a type / target
-  publication, and mark a project recurring. Each project card carries a milestone
-  pipeline you advance stage by stage.
-- **Deadlines** — add deadlines with a due date and priority; recurring projects
-  generate their next occurrence automatically.
-- **Publications** — keep notes on each outlet and review your publication history.
-- **Settings** — customize the dropdown lists and the milestone sequence.
+- **Today** — start here each day.
+- **Ideas** — add and filter ideas; use **Promote to project** when one is ready.
+- **Projects** — create a project with a title, type, outlet and stage template;
+  you land on its page to set dates and work through the stages.
+- **Schedule** — add deadlines and see everything due, in a list or a calendar.
+- **Publications** — keep notes on each outlet and review your history.
+- **Settings** — project types and stage templates.
 
 See [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) for a full walkthrough and keyboard
 shortcuts.
@@ -73,6 +70,15 @@ back it up, sync it, or move it like any other document.
 
 Default location on first launch: `~/Documents/Inkwell/My Writing.inkwell`. The
 five most recently opened files appear under **File > Recent Files**.
+
+### Upgrading older files
+
+Files from 1.2.x use schema version 1. Opening one in 1.3.0 first writes a backup
+named `<file>.pre-v2-backup-<timestamp>.inkwell` next to it, then upgrades the file
+(outlets become records, each project gets its own copy of the stage sequence, your
+old milestone-name list becomes the default template "Standard"). If the backup
+cannot be written, the file is left untouched. A notice names the backup.
+Older versions of Inkwell cannot be relied on to read an upgraded file.
 
 ## Development
 
@@ -134,6 +140,12 @@ cases, path-handling contract, and data-integrity/cascade guarantees — see
 
 ## Version History
 
+- **v1.3.0** (2026-11-25) — Structure redesign: Today and Schedule (agenda and
+  calendar), project pages replacing the edit dialog, per-project stage sequences
+  and templates, Publications as records, promote and mark-published flows, and a
+  backed-up schema v2 migration.
+- **v1.2.9** (2026-11-25) — Delete confirmations, visible action menus, pinned dialog
+  footers, local-date fixes.
 - **v1.2.7** (2026-08-13) — Full dependency modernization: Electron 43, React 19, Vite 8, TypeScript 7, Tailwind CSS 4, Vitest 4, current Radix UI/Drizzle/Playwright tooling, and current application dependencies. Updated the DayPicker, Recharts, and resizable-panel integrations for their new APIs; preserved the `keyv@4.5.4` and `cacheable-request@7.0.4` security pins and the safe `better-sqlite3` 12.x line.
 - **v1.1.0** (2026-07-22) — Dashboard Upcoming list now merges deadlines and
   milestone due dates sorted soonest-first; recurring projects auto-spawn their

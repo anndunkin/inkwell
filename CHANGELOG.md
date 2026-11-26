@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.3.0] - 2026-11-25
+
+Phases 2 to 5 of the structure redesign. Opening an older file upgrades it to schema version 2 after making an automatic backup.
+
+### Added
+- **Today** page replaces the Dashboard: overdue items, the next 7 days (complete or snooze in place), active projects with no dates, and ideas waiting to be promoted.
+- **Schedule** page replaces Deadlines. Deadlines and dated project stages appear together in an Agenda or a Month calendar, with search and project, priority and completed filters. The same Agenda/Calendar view appears on each project's Dates tab.
+- **Project page** (`/projects/:id`) replaces the nine-field edit dialog. Title, status, type and outlet save as you edit; stage details, description, notes, recurrence and history live on the page.
+- **Per-project stage sequences.** Every project owns its stages: add, rename, reorder, set due dates and notes, delete. Start from a template, add stages from another template later, or save a project's stages as a new template.
+- **Stage templates** in Settings: create, rename, edit, reorder, choose the default.
+- **Promote** button on ideas (also on Today). Promoting creates the project, moves the idea to Developing, and opens the project. Promoting twice opens the existing project.
+- **Mark published** banner when a project's last stage is complete: sets the project completed, the idea published, and logs publication history.
+- **Projects list** (default) with stage progress and next due date, plus the Board view; completed and cancelled projects are hidden by default.
+- **Publications** are now real records with a master/detail page: rename, guidelines link, rate, notes, projects aimed at the outlet, and history.
+- One-time notice after an upgrade, naming the backup file.
+
+### Changed
+- Navigation is Today, Ideas, Projects, Schedule, Publications; Settings and the theme toggle moved to the sidebar footer.
+- Settings now holds only preferences: appearance, project types and stage templates. Outlets moved to Publications.
+- Opening a file that fails to load keeps the previously open file and shows an error.
+- A recurring project's next occurrence is still created when its deadline or its "Submitted" stage is completed; the project page has a "Schedule next occurrence" button.
+
+### Data format
+- Schema version 2 adds `publications`, `milestone_templates` and `projects.publication_id`. Older files are upgraded in one transaction after `VACUUM INTO` writes `<name>.pre-v2-backup-<timestamp>.inkwell` beside the original; if the backup cannot be written the file is left untouched. Projects keep the old outlet name text as well, so older readers still work, but files saved by 1.3.0 should be opened with 1.3.0 or later.
+
 ## [1.2.9] - 2026-11-25
 
 Phase 1 of the structure redesign: safety and polish. No data-format changes.
