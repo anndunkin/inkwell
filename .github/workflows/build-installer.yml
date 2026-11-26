@@ -66,8 +66,12 @@ jobs:
         run: |
           $db = Join-Path $env:RUNNER_TEMP 'smoke.inkwell'
           $env:INKWELL_TEST_DB = $db
-          $proc = Start-Process 'C:\InkwellTest\Inkwell.exe' -PassThru
+          $env:ELECTRON_ENABLE_LOGGING = '1'
+          $log = Join-Path $env:RUNNER_TEMP 'inkwell-out.log'
+          $err = Join-Path $env:RUNNER_TEMP 'inkwell-err.log'
+          $proc = Start-Process 'C:\InkwellTest\Inkwell.exe' -ArgumentList '--disable-gpu','--no-sandbox' -PassThru -RedirectStandardOutput $log -RedirectStandardError $err
           Start-Sleep -Seconds 15
+          Get-Content $log, $err -ErrorAction SilentlyContinue | Select-Object -First 60 | Write-Host
           if ($proc.HasExited) { throw "Inkwell exited early with code $($proc.ExitCode)" }
           if (-not (Test-Path $db)) { throw 'Database file was not created: packaged SQLite did not load' }
           Write-Host "Running, database size $((Get-Item $db).Length) bytes"
