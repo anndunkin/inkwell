@@ -83,7 +83,7 @@ export const deadlines = sqliteTable("deadlines", {
   projectId: integer("project_id"), // optional link to project
   dueDate: text("due_date").notNull(), // ISO date string YYYY-MM-DD
   priority: text("priority").notNull().default("medium"), // low, medium, high, critical
-  status: text("status").notNull().default("pending"), // pending, completed, missed
+  status: text("status").notNull().default("pending"), // pending, completed, missed, skipped
   notes: text("notes"),
   createdAt: text("created_at").notNull().default(""),
 });

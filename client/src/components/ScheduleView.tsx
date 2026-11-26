@@ -60,7 +60,7 @@ export function EntryRow({
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap mt-0.5">
             <span className={overdue ? "text-red-500 font-medium" : urgent ? "text-orange-500 font-medium" : ""}>
-              {done ? (entry.status === "completed" ? "Completed" : "Missed") : relativeDue(entry.dueDate)}
+              {done ? (entry.status === "completed" ? "Completed" : entry.status === "skipped" ? "Skipped" : "Missed") : relativeDue(entry.dueDate)}
             </span>
             <span>·</span>
             <span>{formatDate(entry.dueDate)}</span>
@@ -128,7 +128,7 @@ export function Agenda({ entries, showProject, onEdit }: { entries: ScheduleEntr
       <Section title="Overdue" items={g.overdue} showProject={showProject} onEdit={onEdit} />
       <Section title="Due this week" items={g.thisWeek} showProject={showProject} onEdit={onEdit} />
       <Section title="Upcoming" items={g.upcoming} showProject={showProject} onEdit={onEdit} />
-      <Section title="Completed / missed" items={g.done} showProject={showProject} onEdit={onEdit} />
+      <Section title="Completed / missed / skipped" items={g.done} showProject={showProject} onEdit={onEdit} />
     </>
   );
 }

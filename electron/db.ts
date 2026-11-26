@@ -571,6 +571,34 @@ export class InkwellDB {
   }
 
   /**
+   * Skip the current occurrence of a recurring project: its open deadlines are
+   * marked skipped, the next occurrence is scheduled, and this occurrence is
+   * closed (status cancelled) so it leaves Today and Schedule. Nothing is
+   * deleted. Throws, changing nothing, if the project is not recurring, has no
+   * interval, or has no open deadline to skip.
+   */
+  skipRecurringOccurrence(projectId: number): { skipped: number; next: Project | null } {
+    const project = this.getProject(projectId);
+    if (!project) throw new Error("Project not found");
+    if (!project.isRecurring) throw new Error("This project is not recurring.");
+    if (!project.recurringInterval) throw new Error("Set a recurrence interval before skipping an occurrence.");
+    const open = this.db.select().from(deadlines)
+      .where(eq(deadlines.projectId, projectId)).all()
+      .filter(d => d.status === "pending");
+    if (open.length === 0) throw new Error("There is no open deadline to skip.");
+
+    let next: Project | null = null;
+    const tx = this.sqlite.transaction(() => {
+      // Spawn first: it reads this project's latest deadline date to place the next one.
+      next = this.spawnNextRecurringDeadline(projectId);
+      for (const d of open) this.updateDeadline(d.id, { status: "skipped" });
+      this.updateProject(projectId, { status: "cancelled" });
+    });
+    tx();
+    return { skipped: open.length, next };
+  }
+
+  /**
    * Create the next project instance for a recurring project. The original
    * project, including its deadlines and milestones, remains unchanged.
    */

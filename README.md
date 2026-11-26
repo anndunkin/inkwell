@@ -1,6 +1,6 @@
 # Inkwell — Writing Tracker
 
-**Version 1.3.1**
+**Version 1.3.2**
 
 Inkwell is a local-first desktop app for writers who want to track ideas from a
 spark all the way to publication. Capture ideas, promote them into projects, walk
@@ -26,7 +26,7 @@ Built with Electron, React, Vite, shadcn/ui, and SQLite (better-sqlite3 + Drizzl
 - **Schedule** — deadlines and dated project stages together, as an Agenda or a
   Month calendar. The same view appears on each project's Dates tab. Recurring
   projects schedule their next occurrence when a deadline or "Submitted" stage is
-  completed.
+  completed, or you can skip an occurrence.
 - **Publications** — outlets with guidelines link, rate, notes, the projects aimed
   at them, and a history of pieces. Finishing a project's last stage offers
   **Mark published**, which records the history entry for you.
@@ -40,7 +40,7 @@ Built with Electron, React, Vite, shadcn/ui, and SQLite (better-sqlite3 + Drizzl
 Inkwell ships as a Windows desktop application.
 
 1. Go to [Releases](https://github.com/anndunkin/inkwell/releases).
-2. Download the latest `Inkwell-Setup-1.3.1.exe`.
+2. Download the latest `Inkwell-Setup-1.3.2.exe`.
 3. Run the installer and launch Inkwell from the Start menu.
 
 ## Using Inkwell
@@ -149,6 +149,7 @@ upgrading over an installed copy, repair, and code signing.
 
 ## Version History
 
+- **v1.3.2** (2026-11-26) — Skip this occurrence for recurring projects.
 - **v1.3.1** (2026-11-26) — Fix: completing a recurring project's deadline no longer leaves
   it showing as open on Today and Schedule.
 - **v1.3.0** (2026-11-25) — Structure redesign: Today and Schedule (agenda and
