@@ -11,7 +11,19 @@ import type {
   Milestone,
   InsertMilestone,
   PublicationNote,
+  Publication,
+  InsertPublication,
+  MilestoneTemplate,
+  MilestoneTemplateInput,
+  PublishResult,
 } from "../shared/schema";
+
+export interface MigrationNotice {
+  backupPath: string | null;
+  fromVersion: number;
+  toVersion: number;
+  file: string;
+}
 
 export interface FileResult {
   success: boolean;
@@ -21,13 +33,16 @@ export interface FileResult {
 export interface InkwellApi {
   ideas: {
     getAll: () => Promise<Idea[]>;
+    promote: (id: number, opts?: { type?: string; publicationId?: number | null; templateId?: number | null }) => Promise<Project>;
     create: (data: InsertIdea) => Promise<Idea>;
     update: (id: number, data: Partial<InsertIdea>) => Promise<Idea>;
     delete: (id: number) => Promise<boolean>;
   };
   projects: {
     getAll: () => Promise<Project[]>;
-    create: (data: InsertProject) => Promise<Project>;
+    create: (data: InsertProject, templateId?: number | null) => Promise<Project>;
+    applyTemplate: (projectId: number, templateId: number) => Promise<Milestone[]>;
+    publish: (projectId: number, publishedDate: string) => Promise<PublishResult>;
     update: (id: number, data: Partial<InsertProject>) => Promise<Project>;
     delete: (id: number) => Promise<boolean>;
   };
@@ -46,12 +61,26 @@ export interface InkwellApi {
     save: () => Promise<FileResult>;
     saveAs: () => Promise<FileResult>;
     getRecentFiles: () => Promise<string[]>;
+    takeMigrationNotice: () => Promise<MigrationNotice | null>;
   };
   milestones: {
     getAll: () => Promise<Milestone[]>;
     getForProject: (projectId: number) => Promise<Milestone[]>;
     create: (data: InsertMilestone) => Promise<Milestone>;
     update: (id: number, data: Partial<InsertMilestone>) => Promise<Milestone>;
+    reorder: (projectId: number, orderedIds: number[]) => Promise<Milestone[]>;
+    delete: (id: number) => Promise<boolean>;
+  };
+  publications: {
+    getAll: () => Promise<Publication[]>;
+    create: (data: Partial<InsertPublication> & { name: string }) => Promise<Publication>;
+    update: (id: number, data: Partial<InsertPublication>) => Promise<Publication>;
+    delete: (id: number) => Promise<boolean>;
+  };
+  templates: {
+    getAll: () => Promise<MilestoneTemplate[]>;
+    create: (data: MilestoneTemplateInput) => Promise<MilestoneTemplate>;
+    update: (id: number, data: Partial<MilestoneTemplateInput>) => Promise<MilestoneTemplate>;
     delete: (id: number) => Promise<boolean>;
   };
   pubHistory: {
@@ -75,13 +104,16 @@ export interface InkwellApi {
 const api: InkwellApi = {
   ideas: {
     getAll: () => ipcRenderer.invoke("ideas:getAll"),
+    promote: (id, opts) => ipcRenderer.invoke("ideas:promote", id, opts),
     create: (data) => ipcRenderer.invoke("ideas:create", data),
     update: (id, data) => ipcRenderer.invoke("ideas:update", id, data),
     delete: (id) => ipcRenderer.invoke("ideas:delete", id),
   },
   projects: {
     getAll: () => ipcRenderer.invoke("projects:getAll"),
-    create: (data) => ipcRenderer.invoke("projects:create", data),
+    create: (data, templateId) => ipcRenderer.invoke("projects:create", data, templateId),
+    applyTemplate: (projectId, templateId) => ipcRenderer.invoke("projects:applyTemplate", projectId, templateId),
+    publish: (projectId, publishedDate) => ipcRenderer.invoke("projects:publish", projectId, publishedDate),
     update: (id, data) => ipcRenderer.invoke("projects:update", id, data),
     delete: (id) => ipcRenderer.invoke("projects:delete", id),
   },
@@ -100,13 +132,27 @@ const api: InkwellApi = {
     save: () => ipcRenderer.invoke("file:save"),
     saveAs: () => ipcRenderer.invoke("file:saveAs"),
     getRecentFiles: () => ipcRenderer.invoke("file:getRecentFiles"),
+    takeMigrationNotice: () => ipcRenderer.invoke("file:takeMigrationNotice"),
   },
   milestones: {
     getAll: () => ipcRenderer.invoke("milestones:getAll"),
     getForProject: (projectId: number) => ipcRenderer.invoke("milestones:getForProject", projectId),
     create: (data: InsertMilestone) => ipcRenderer.invoke("milestones:create", data),
     update: (id: number, data: Partial<InsertMilestone>) => ipcRenderer.invoke("milestones:update", id, data),
+    reorder: (projectId: number, orderedIds: number[]) => ipcRenderer.invoke("milestones:reorder", projectId, orderedIds),
     delete: (id: number) => ipcRenderer.invoke("milestones:delete", id),
+  },
+  publications: {
+    getAll: () => ipcRenderer.invoke("publications:getAll"),
+    create: (data) => ipcRenderer.invoke("publications:create", data),
+    update: (id, data) => ipcRenderer.invoke("publications:update", id, data),
+    delete: (id) => ipcRenderer.invoke("publications:delete", id),
+  },
+  templates: {
+    getAll: () => ipcRenderer.invoke("templates:getAll"),
+    create: (data) => ipcRenderer.invoke("templates:create", data),
+    update: (id, data) => ipcRenderer.invoke("templates:update", id, data),
+    delete: (id) => ipcRenderer.invoke("templates:delete", id),
   },
   pubHistory: {
     getAll: () => ipcRenderer.invoke("pubHistory:getAll"),
