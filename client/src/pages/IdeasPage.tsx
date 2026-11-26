@@ -1,9 +1,13 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Trash2, Tag, X } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ArrowUpRight, ExternalLink } from "lucide-react";
+import { useProjects } from "@/lib/data";
+import RowMenu from "@/components/RowMenu";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -29,11 +33,22 @@ const STATUSES = ["new", "developing", "parked", "published"];
 
 export default function IdeasPage() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterCat, setFilterCat] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editIdea, setEditIdea] = useState<Idea | null>(null);
+  const [, navigate] = useLocation();
+  const { data: projects = [] } = useProjects();
+  const projectFor = (ideaId: number) => projects.find(p => p.ideaId === ideaId);
+
+  async function promote(idea: Idea) {
+    const project = await ipc().ideas.promote(idea.id, {});
+    await queryClient.invalidateQueries();
+    toast({ title: "Idea promoted to a project" });
+    navigate(`/projects/${project.id}`);
+  }
 
   const { data: ideas, isLoading } = useQuery<Idea[]>({ queryKey: ["/api/ideas"] });
 
@@ -56,6 +71,14 @@ export default function IdeasPage() {
     mutationFn: (id: number) => ipc().ideas.delete(id),
     onSuccess: () => { queryClient.refetchQueries({ queryKey: ["/api/ideas"] }); toast({ title: "Idea deleted" }); },
   });
+
+  async function requestDelete(idea: Idea) {
+    const ok = await confirm({
+      title: `Delete "${idea.title}"?`,
+      description: "This idea will be removed permanently. Projects linked to it keep their own details.",
+    });
+    if (ok) deleteMutation.mutate(idea.id);
+  }
 
   function openNew() {
     setEditIdea(null);
@@ -135,7 +158,7 @@ export default function IdeasPage() {
         </div>
       ) : filterStatus !== "all" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(idea => <IdeaCard key={idea.id} idea={idea} onEdit={openEdit} onDelete={id => deleteMutation.mutate(id)} />)}
+          {filtered.map(idea => <IdeaCard key={idea.id} idea={idea} onEdit={openEdit} onDelete={requestDelete} onPromote={promote} project={projectFor(idea.id)} onOpen={(id) => navigate(`/projects/${id}`)} />)}
         </div>
       ) : (
         <div className="space-y-8">
@@ -143,7 +166,7 @@ export default function IdeasPage() {
             <div key={s}>
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 capitalize">{s} ({grouped[s].length})</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {grouped[s].map(idea => <IdeaCard key={idea.id} idea={idea} onEdit={openEdit} onDelete={id => deleteMutation.mutate(id)} />)}
+                {grouped[s].map(idea => <IdeaCard key={idea.id} idea={idea} onEdit={openEdit} onDelete={requestDelete} onPromote={promote} project={projectFor(idea.id)} onOpen={(id) => navigate(`/projects/${id}`)} />)}
               </div>
             </div>
           ))}
@@ -217,23 +240,41 @@ export default function IdeasPage() {
   );
 }
 
-function IdeaCard({ idea, onEdit, onDelete }: { idea: Idea; onEdit: (i: Idea) => void; onDelete: (id: number) => void }) {
+function IdeaCard({ idea, onEdit, onDelete, onPromote, project, onOpen }: { idea: Idea; onEdit: (i: Idea) => void; onDelete: (idea: Idea) => void; onPromote: (i: Idea) => void; project?: { id: number }; onOpen: (id: number) => void }) {
   const tags = JSON.parse(idea.tags || "[]") as string[];
   return (
     <Card data-testid={`idea-card-${idea.id}`} className="group hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <h3 className="text-sm font-medium leading-snug flex-1">{idea.title}</h3>
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-            <button onClick={() => onEdit(idea)} data-testid={`button-edit-idea-${idea.id}`} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><Pencil className="w-3.5 h-3.5" /></button>
-            <button onClick={() => onDelete(idea.id)} data-testid={`button-delete-idea-${idea.id}`} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
-          </div>
+          <RowMenu
+            label={`Actions for ${idea.title}`}
+            testId={`menu-idea-${idea.id}`}
+            items={[
+              project
+                ? { label: "Open project", icon: <ExternalLink className="w-3.5 h-3.5" />, onSelect: () => onOpen(project.id), testId: `button-open-idea-project-${idea.id}` }
+                : { label: "Promote to project", icon: <ArrowUpRight className="w-3.5 h-3.5" />, onSelect: () => onPromote(idea), testId: `menu-promote-idea-${idea.id}` },
+              { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => onEdit(idea), testId: `button-edit-idea-${idea.id}` },
+              { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: true, onSelect: () => onDelete(idea), testId: `button-delete-idea-${idea.id}` },
+            ]}
+          />
         </div>
         {idea.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{idea.description}</p>}
         <div className="flex items-center gap-1.5 flex-wrap">
           <Badge variant="outline" className={`text-xs status-${idea.status}`}>{idea.status}</Badge>
           <Badge variant="outline" className="text-xs capitalize">{idea.category}</Badge>
           {tags.map((t, i) => <span key={i} className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm">{t}</span>)}
+        </div>
+        <div className="mt-3">
+          {project ? (
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onOpen(project.id)} data-testid={`button-view-project-${idea.id}`}>
+              <ExternalLink className="w-3 h-3" /> Open project
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onPromote(idea)} data-testid={`button-promote-idea-${idea.id}`}>
+              <ArrowUpRight className="w-3 h-3" /> Promote to project
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

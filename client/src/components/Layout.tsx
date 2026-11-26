@@ -1,25 +1,33 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Lightbulb, FolderOpen, Calendar, LayoutDashboard, Moon, Sun, Settings, BookOpen } from "lucide-react";
+import { Lightbulb, FolderOpen, Calendar, Sun as TodayIcon, Moon, Sun, Settings, BookOpen, X } from "lucide-react";
+import { ipc } from "@/lib/ipc";
 import { useTheme } from "./ThemeProvider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import FileStatusBar from "./FileStatusBar";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/", label: "Today", icon: TodayIcon },
   { href: "/ideas", label: "Ideas", icon: Lightbulb },
   { href: "/projects", label: "Projects", icon: FolderOpen },
-  { href: "/deadlines", label: "Deadlines", icon: Calendar },
+  { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/publications", label: "Publications", icon: BookOpen },
-  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { theme, toggle } = useTheme();
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const check = () => { ipc().file.takeMigrationNotice().then(n => { if (n) setNotice(`Your file was upgraded to the new format. ${n.backupPath ? `A backup of the original was saved as ${n.backupPath.split(/[\\/]/).pop()} in the same folder.` : ""}`); }).catch(() => {}); };
+    check();
+    return ipc().onRefresh(check);
+  }, []);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar */}
       <aside className="w-60 shrink-0 flex flex-col border-r border-border bg-sidebar">
         {/* Logo */}
@@ -44,32 +52,44 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {navItems.map(({ href, label, icon: Icon }) => {
             const active = location === href || (href !== "/" && location.startsWith(href));
             return (
-              <Link key={href} href={href}>
-                <a
-                  data-testid={`nav-${label.toLowerCase()}`}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors cursor-pointer",
-                    active
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  )}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  {label}
-                </a>
+              <Link
+                key={href}
+                href={href}
+                data-testid={`nav-${label.toLowerCase()}`}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors cursor-pointer",
+                  active
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {label}
               </Link>
             );
           })}
         </nav>
 
         {/* Theme toggle */}
-        <div className="px-4 py-4 border-t border-sidebar-border">
+        <div className="px-3 py-3 border-t border-sidebar-border space-y-0.5">
+          <Link
+            href="/settings"
+            data-testid="nav-settings"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-md text-sm",
+              location.startsWith("/settings")
+                ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                : "text-sidebar-foreground hover:bg-sidebar-accent"
+            )}
+          >
+            <Settings className="w-4 h-4" /> Settings
+          </Link>
           <Button
             variant="ghost"
             size="sm"
             onClick={toggle}
             data-testid="button-theme-toggle"
-            className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent"
+            className="w-full justify-start gap-2 px-3 text-sidebar-foreground hover:bg-sidebar-accent"
           >
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             {theme === "dark" ? "Light mode" : "Dark mode"}
@@ -78,8 +98,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-h-screen overflow-auto flex flex-col">
+      <main className="flex-1 min-w-0 h-screen overflow-hidden flex flex-col">
         <FileStatusBar />
+        {notice && (
+          <div role="status" data-testid="migration-notice" className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm bg-primary/10 border-b border-border">
+            <p className="min-w-0 break-words">{notice}</p>
+            <button type="button" aria-label="Dismiss" data-testid="button-dismiss-notice" onClick={() => setNotice(null)} className="p-1 rounded hover:bg-muted shrink-0"><X className="w-4 h-4" /></button>
+          </div>
+        )}
         <div className="flex-1 overflow-auto">
           {children}
         </div>

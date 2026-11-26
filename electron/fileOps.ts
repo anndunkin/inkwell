@@ -12,8 +12,19 @@ export class FileSession {
 
   /** Open (or create) a database file and make it the active session. */
   open(filePath: string): InkwellDB {
+    const previousPath = this.currentPath;
     this.db?.close();
-    this.db = new InkwellDB(filePath);
+    this.db = null;
+    try {
+      this.db = new InkwellDB(filePath);
+    } catch (err) {
+      // e.g. an older file could not be backed up before upgrading: it is left
+      // untouched, and the previously open file is restored.
+      if (previousPath && previousPath !== filePath && existsSync(previousPath)) {
+        try { this.db = new InkwellDB(previousPath); } catch { /* leave closed */ }
+      }
+      throw err;
+    }
     this.currentPath = filePath;
     this.isDirty = false;
     return this.db;

@@ -26,7 +26,8 @@ export const projects = sqliteTable("projects", {
   type: text("type").notNull().default("article"), // article, book, essay, blog, speech, report, other
   status: text("status").notNull().default("active"), // active, on-hold, completed, cancelled
   ideaId: integer("idea_id"), // optional link to an idea
-  publication: text("publication"), // target publication outlet
+  publication: text("publication"), // target outlet name (mirror of publicationId, kept for older readers)
+  publicationId: integer("publication_id"), // FK-like link to publications.id
   isRecurring: integer("is_recurring", { mode: "boolean" }).notNull().default(false),
   recurringInterval: text("recurring_interval"), // weekly, biweekly, monthly, quarterly, annual
   notes: text("notes"),
@@ -104,3 +105,38 @@ export const publicationNotes = sqliteTable("publication_notes", {
 export const insertPublicationNoteSchema = createInsertSchema(publicationNotes).omit({ id: true });
 export type InsertPublicationNote = z.infer<typeof insertPublicationNoteSchema>;
 export type PublicationNote = typeof publicationNotes.$inferSelect;
+
+// Publications (outlets). Replaces the JSON list in settings plus publication_notes.
+export const publications = sqliteTable("publications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull().unique(),
+  notes: text("notes").notNull().default(""), // editor contacts, guidelines, anything
+  guidelinesUrl: text("guidelines_url"),
+  rate: text("rate"), // free text, e.g. "$0.50/word"
+  createdAt: text("created_at").notNull().default(""),
+});
+
+export const insertPublicationSchema = createInsertSchema(publications).omit({ id: true });
+export type InsertPublication = z.infer<typeof insertPublicationSchema>;
+export type Publication = typeof publications.$inferSelect;
+
+// Milestone templates: named stage sequences used to seed a project's own pipeline.
+export const milestoneTemplates = sqliteTable("milestone_templates", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull().unique(),
+  stages: text("stages").notNull().default("[]"), // JSON array of stage names, in order
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+});
+
+export type MilestoneTemplate = typeof milestoneTemplates.$inferSelect;
+export interface MilestoneTemplateInput {
+  name: string;
+  stages: string[];
+  isDefault?: boolean;
+}
+
+/** Result of promoting an idea or publishing a project. */
+export interface PublishResult {
+  project: Project;
+  history: PublicationHistory | null;
+}

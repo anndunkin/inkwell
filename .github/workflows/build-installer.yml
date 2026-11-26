@@ -1,0 +1,88 @@
+name: Build and test Windows installer
+
+# Builds the installer and tests install, launch, uninstall on a clean Windows runner.
+# Publishes nothing: the installer is attached to the run as an artifact.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild better-sqlite3 for Electron
+        run: npx electron-rebuild -f -w better-sqlite3
+        shell: pwsh
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build app
+        run: npm run build
+
+      - name: Electron end-to-end tests
+        run: npx playwright test
+
+      - name: Build NSIS installer
+        shell: pwsh
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Inkwell-Setup
+          path: release/*.exe
+          if-no-files-found: error
+
+      - name: Silent install
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem release -Filter *.exe | Where-Object { $_.Name -notlike 'Uninstall*' } | Select-Object -First 1).FullName
+          Write-Host "Installing $installer"
+          $p = Start-Process $installer -ArgumentList '/S', '/D=C:\InkwellTest' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installer exit code $($p.ExitCode)" }
+          if (-not (Test-Path 'C:\InkwellTest\Inkwell.exe')) { throw 'Inkwell.exe was not installed' }
+          if (-not (Test-Path 'C:\InkwellTest\Uninstall Inkwell.exe')) { throw 'Uninstaller was not installed' }
+          $roots = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall','HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall','HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+          $key = foreach ($r in $roots) { if (Test-Path $r) { Get-ChildItem $r | Where-Object { $p = Get-ItemProperty $_.PSPath; $p.DisplayName -like '*Inkwell*' -or $p.InstallLocation -like '*InkwellTest*' -or $p.UninstallString -like '*InkwellTest*' } } }
+          if (-not $key) { Get-ChildItem $roots -ErrorAction SilentlyContinue | ForEach-Object { (Get-ItemProperty $_.PSPath).DisplayName } | Write-Host; throw 'No uninstall registry entry' }
+          Write-Host 'Install verified'
+
+      - name: Launch installed app and confirm the database opens
+        shell: pwsh
+        run: |
+          $db = Join-Path $env:RUNNER_TEMP 'smoke.inkwell'
+          $env:INKWELL_TEST_DB = $db
+          $env:ELECTRON_ENABLE_LOGGING = '1'
+          $log = Join-Path $env:RUNNER_TEMP 'inkwell-out.log'
+          $err = Join-Path $env:RUNNER_TEMP 'inkwell-err.log'
+          $proc = Start-Process 'C:\InkwellTest\Inkwell.exe' -ArgumentList '--disable-gpu','--no-sandbox' -PassThru -RedirectStandardOutput $log -RedirectStandardError $err
+          Start-Sleep -Seconds 15
+          Get-Content $log, $err -ErrorAction SilentlyContinue | Select-Object -First 60 | Write-Host
+          if ($proc.HasExited) { throw "Inkwell exited early with code $($proc.ExitCode)" }
+          if (-not (Test-Path $db)) { throw 'Database file was not created: packaged SQLite did not load' }
+          Write-Host "Running, database size $((Get-Item $db).Length) bytes"
+          Stop-Process -Id $proc.Id -Force
+          Get-Process Inkwell -ErrorAction SilentlyContinue | Stop-Process -Force
+
+      - name: Silent uninstall
+        shell: pwsh
+        run: |
+          $p = Start-Process 'C:\InkwellTest\Uninstall Inkwell.exe' -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Uninstaller exit code $($p.ExitCode)" }
+          for ($i = 0; $i -lt 30 -and (Test-Path 'C:\InkwellTest\Inkwell.exe'); $i++) { Start-Sleep -Seconds 2 }
+          if (Test-Path 'C:\InkwellTest\Inkwell.exe') { throw 'Inkwell.exe still present after uninstall' }
+          Write-Host 'Uninstall verified'

@@ -24,8 +24,8 @@ test.afterAll(async () => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test("app launches and shows Dashboard", async () => {
-  await expect(page.getByText("writing workspace")).toBeVisible();
+test("app launches and shows Today", async () => {
+  await expect(page.getByTestId("text-greeting")).toBeVisible();
   await expect(page.getByTestId("file-status-bar")).toBeVisible();
 });
 
@@ -40,28 +40,32 @@ test("create an idea and see it on the Ideas page", async () => {
 test("edit and delete an idea", async () => {
   // Idea card id is dynamic; locate the edit button within the visible card.
   const card = page.locator('[data-testid^="idea-card-"]').filter({ hasText: "Solar policy explainer" }).first();
-  await card.hover();
-  await card.locator('[data-testid^="button-edit-idea-"]').click();
+  await card.locator('[data-testid^="menu-idea-"]').click();
+  await page.locator('[data-testid^="button-edit-idea-"]').click();
   await page.getByTestId("input-idea-title").fill("Solar policy (revised)");
   await page.getByTestId("button-save-idea").click();
   await expect(page.getByText("Solar policy (revised)")).toBeVisible();
 
   const revised = page.locator('[data-testid^="idea-card-"]').filter({ hasText: "Solar policy (revised)" }).first();
-  await revised.hover();
-  await revised.locator('[data-testid^="button-delete-idea-"]').click();
+  await revised.locator('[data-testid^="menu-idea-"]').click();
+  await page.locator('[data-testid^="button-delete-idea-"]').click();
+  await page.getByTestId("confirm-accept").click();
   await expect(page.getByText("Solar policy (revised)")).toHaveCount(0);
 });
 
-test("create a project and see it on the kanban", async () => {
+test("create a project and land on its project page", async () => {
   await page.getByTestId("nav-projects").click();
   await page.getByTestId("button-new-project").click();
   await page.getByTestId("input-project-title").fill("Energy whitepaper");
   await page.getByTestId("button-save-project").click();
-  await expect(page.getByText("Energy whitepaper")).toBeVisible();
+  await expect(page.getByTestId("project-page")).toBeVisible();
+  await expect(page.getByTestId("input-project-page-title")).toHaveValue("Energy whitepaper");
+  // The default template seeds this project's own stage sequence.
+  await expect(page.locator('[data-testid^="stage-"]').first()).toBeVisible();
 });
 
 test("create a deadline and see it listed", async () => {
-  await page.getByTestId("nav-deadlines").click();
+  await page.getByTestId("nav-schedule").click();
   await page.getByTestId("button-new-deadline").click();
   await page.getByTestId("input-deadline-title").fill("Final manuscript");
   await page.getByTestId("input-deadline-date").fill("2026-12-31");
@@ -73,17 +77,16 @@ test("add notes to a publication card and persist them", async () => {
   // Navigate via the hash router directly so a lingering dialog overlay from a
   // prior test cannot intercept a sidebar click.
   await page.evaluate(() => { window.location.hash = "#/publications"; });
-  const toggle = page.getByTestId("button-toggle-pub-notes-The Atlantic");
-  await toggle.click();
-  const textarea = page.getByTestId("textarea-pub-notes-The Atlantic");
+  await page.getByRole("button", { name: /The Atlantic/ }).click();
+  const textarea = page.getByTestId("input-publication-notes");
   await textarea.fill("Editor: jane@example.com — 1200 word max");
   // Blur to trigger auto-save.
   await textarea.blur();
   // Confirm it persisted through the IPC layer.
   await expect.poll(async () =>
     page.evaluate(async () => {
-      const notes = await window.inkwell.pubNotes.getAll();
-      return notes.find((n) => n.publicationName === "The Atlantic")?.notes ?? "";
+      const pubs = await window.inkwell.publications.getAll();
+      return pubs.find((p) => p.name === "The Atlantic")?.notes ?? "";
     })
   ).toBe("Editor: jane@example.com — 1200 word max");
 });

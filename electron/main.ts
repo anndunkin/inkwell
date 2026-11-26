@@ -10,6 +10,8 @@ import type {
   InsertDeadline,
   InsertPublicationHistory,
   InsertMilestone,
+  InsertPublication,
+  MilestoneTemplateInput,
 } from "../shared/schema";
 
 // ---- Crash logging ----
@@ -110,8 +112,13 @@ function setDirty(value: boolean) {
   updateTitle();
 }
 
+/** Pending notice about an automatic upgrade of the file that was just opened. */
+let migrationNotice: { backupPath: string | null; fromVersion: number; toVersion: number; file: string } | null = null;
+
 function openDatabase(filePath: string) {
   session.open(filePath);
+  const m = session.db?.migration;
+  if (m) migrationNotice = { ...m, file: filePath };
   updateTitle();
   addRecentFile(filePath);
   refreshMenu();
@@ -134,6 +141,12 @@ function spawnRecurringForActiveDb() {
 /** Open the default file on launch, creating it in ~/Documents/Inkwell if needed. */
 function openInitialDatabase() {
   // Tests set INKWELL_TEST_DB to a temp path for a clean, isolated database.
+  // INKWELL_TEST_OPEN_DB opens an existing file as-is (used to test upgrades of older files).
+  const testOpen = process.env.INKWELL_TEST_OPEN_DB;
+  if (testOpen) {
+    openDatabase(testOpen);
+    return;
+  }
   const testDb = process.env.INKWELL_TEST_DB;
   if (testDb) {
     session.newFile(testDb);
@@ -160,7 +173,12 @@ function refreshMenu() {
       saveAs: () => void doSaveAs(),
       openRecent: (p) => {
         if (existsSync(p)) {
-          openDatabase(p);
+          try {
+            openDatabase(p);
+          } catch (err) {
+            writeLog("openRecent FAILED", err);
+            dialog.showErrorBox("Inkwell could not open that file", err instanceof Error ? err.message : String(err));
+          }
           reloadRenderer();
         }
       },
@@ -199,7 +217,14 @@ async function doOpen(): Promise<{ success: boolean; path?: string }> {
     filters: [{ name: "Inkwell File", extensions: ["inkwell"] }],
   });
   if (result.canceled || result.filePaths.length === 0) return { success: false };
-  openDatabase(result.filePaths[0]);
+  try {
+    openDatabase(result.filePaths[0]);
+  } catch (err) {
+    writeLog("doOpen FAILED", err);
+    dialog.showErrorBox("Inkwell could not open that file", err instanceof Error ? err.message : String(err));
+    reloadRenderer();
+    return { success: false };
+  }
   reloadRenderer();
   return { success: true, path: result.filePaths[0] };
 }
@@ -275,7 +300,10 @@ function registerIpc() {
 
   // Projects
   ipcMain.handle("projects:getAll", () => requireDb().getAllProjects());
-  ipcMain.handle("projects:create", (_e, data: InsertProject) => dirtyAfter(requireDb().createProject(data)));
+  ipcMain.handle("projects:create", (_e, data: InsertProject, templateId?: number | null) => dirtyAfter(requireDb().createProject(data, templateId)));
+  ipcMain.handle("projects:applyTemplate", (_e, projectId: number, templateId: number) => dirtyAfter(requireDb().applyTemplateToProject(projectId, templateId)));
+  ipcMain.handle("projects:publish", (_e, projectId: number, publishedDate: string) => dirtyAfter(requireDb().publishProject(projectId, publishedDate)));
+  ipcMain.handle("ideas:promote", (_e, ideaId: number, opts?: { type?: string; publicationId?: number | null; templateId?: number | null }) => dirtyAfter(requireDb().promoteIdea(ideaId, opts)));
   ipcMain.handle("projects:update", (_e, id: number, data: Partial<InsertProject>) => dirtyAfter(requireDb().updateProject(id, data)));
   ipcMain.handle("projects:delete", (_e, id: number) => dirtyAfter(requireDb().deleteProject(id)));
 
@@ -285,8 +313,13 @@ function registerIpc() {
   ipcMain.handle("deadlines:update", (_e, id: number, data: Partial<InsertDeadline>) => {
     const updated = dirtyAfter(requireDb().updateDeadline(id, data));
     // When a recurring project's deadline is completed, schedule the next one.
+    // A failure here must not turn an already-saved completion into an error.
     if (data.status === "completed" && updated?.projectId) {
-      requireDb().spawnNextRecurringDeadline(updated.projectId);
+      try {
+        requireDb().spawnNextRecurringDeadline(updated.projectId);
+      } catch (err) {
+        writeLog("deadlines:update recurring spawn failed", err);
+      }
     }
     return updated;
   });
@@ -300,6 +333,7 @@ function registerIpc() {
   ipcMain.handle("file:open", () => doOpen());
   ipcMain.handle("file:save", () => doSave());
   ipcMain.handle("file:saveAs", () => doSaveAs());
+  ipcMain.handle("file:takeMigrationNotice", () => { const n = migrationNotice; migrationNotice = null; return n; });
   ipcMain.handle("file:getRecentFiles", () => getRecentFiles().slice(0, RECENT_FILES_MENU));
 
   // Settings
@@ -319,9 +353,7 @@ function registerIpc() {
       if (data.status === "completed" && updated) {
         const project = requireDb().getProject(updated.projectId);
         if (project?.isRecurring) {
-          const settings = requireDb().getSettings();
-          const submittedName = settings.milestoneNames.find(name => name.toLowerCase() === "submitted") ?? "Submitted";
-          if (updated.name.toLowerCase() === submittedName.toLowerCase()) {
+          if (updated.name.trim().toLowerCase() === "submitted") {
             requireDb().spawnNextRecurringDeadline(project.id);
           }
         }
@@ -331,6 +363,7 @@ function registerIpc() {
     }
     return updated;
   });
+  ipcMain.handle("milestones:reorder", (_e, projectId: number, orderedIds: number[]) => dirtyAfter(requireDb().reorderMilestones(projectId, orderedIds)));
   ipcMain.handle("milestones:delete", (_e, id: number) => dirtyAfter(requireDb().deleteMilestone(id)));
 
   // Publication history
@@ -338,6 +371,18 @@ function registerIpc() {
   ipcMain.handle("pubHistory:create", (_e, data: InsertPublicationHistory) => dirtyAfter(requireDb().createPublicationHistory(data)));
   ipcMain.handle("pubHistory:update", (_e, id: number, data: Partial<InsertPublicationHistory>) => dirtyAfter(requireDb().updatePublicationHistory(id, data)));
   ipcMain.handle("pubHistory:delete", (_e, id: number) => dirtyAfter(requireDb().deletePublicationHistory(id)));
+
+  // Publications (outlets)
+  ipcMain.handle("publications:getAll", () => requireDb().getAllPublications());
+  ipcMain.handle("publications:create", (_e, data: Partial<InsertPublication> & { name: string }) => dirtyAfter(requireDb().createPublication(data)));
+  ipcMain.handle("publications:update", (_e, id: number, data: Partial<InsertPublication>) => dirtyAfter(requireDb().updatePublication(id, data)));
+  ipcMain.handle("publications:delete", (_e, id: number) => dirtyAfter(requireDb().deletePublication(id)));
+
+  // Milestone templates
+  ipcMain.handle("templates:getAll", () => requireDb().getAllMilestoneTemplates());
+  ipcMain.handle("templates:create", (_e, data: MilestoneTemplateInput) => dirtyAfter(requireDb().createMilestoneTemplate(data)));
+  ipcMain.handle("templates:update", (_e, id: number, data: Partial<MilestoneTemplateInput>) => dirtyAfter(requireDb().updateMilestoneTemplate(id, data)));
+  ipcMain.handle("templates:delete", (_e, id: number) => dirtyAfter(requireDb().deleteMilestoneTemplate(id)));
 
   // Publication notes
   ipcMain.handle("pubNotes:getAll", () => requireDb().getAllPublicationNotes());
@@ -369,7 +414,7 @@ function createWindow() {
 
   mainWindow.on("close", (e) => {
     // In test mode, never block close on the unsaved-changes dialog.
-    if (forceQuit || !session.isDirty || process.env.INKWELL_TEST_DB) return;
+    if (forceQuit || !session.isDirty || process.env.INKWELL_TEST_DB || process.env.INKWELL_TEST_OPEN_DB) return;
     e.preventDefault();
     void handleCloseRequest();
   });
