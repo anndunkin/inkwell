@@ -141,6 +141,12 @@ function spawnRecurringForActiveDb() {
 /** Open the default file on launch, creating it in ~/Documents/Inkwell if needed. */
 function openInitialDatabase() {
   // Tests set INKWELL_TEST_DB to a temp path for a clean, isolated database.
+  // INKWELL_TEST_OPEN_DB opens an existing file as-is (used to test upgrades of older files).
+  const testOpen = process.env.INKWELL_TEST_OPEN_DB;
+  if (testOpen) {
+    openDatabase(testOpen);
+    return;
+  }
   const testDb = process.env.INKWELL_TEST_DB;
   if (testDb) {
     session.newFile(testDb);
@@ -403,7 +409,7 @@ function createWindow() {
 
   mainWindow.on("close", (e) => {
     // In test mode, never block close on the unsaved-changes dialog.
-    if (forceQuit || !session.isDirty || process.env.INKWELL_TEST_DB) return;
+    if (forceQuit || !session.isDirty || process.env.INKWELL_TEST_DB || process.env.INKWELL_TEST_OPEN_DB) return;
     e.preventDefault();
     void handleCloseRequest();
   });

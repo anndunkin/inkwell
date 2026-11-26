@@ -27,6 +27,9 @@ Phases 2 to 5 of the structure redesign. Opening an older file upgrades it to sc
 - Opening a file that fails to load keeps the previously open file and shows an error.
 - A recurring project's next occurrence is still created when its deadline or its "Submitted" stage is completed; the project page has a "Schedule next occurrence" button.
 
+### Testing
+- New end-to-end suite opens a generated 1.2.x file in Electron and checks the upgrade notice, the backup, data integrity, the legacy project page, and that reopening makes no second backup. The test-only `INKWELL_TEST_OPEN_DB` variable opens an existing file without resetting it.
+
 ### Data format
 - Schema version 2 adds `publications`, `milestone_templates` and `projects.publication_id`. Older files are upgraded in one transaction after `VACUUM INTO` writes `<name>.pre-v2-backup-<timestamp>.inkwell` beside the original; if the backup cannot be written the file is left untouched. Projects keep the old outlet name text as well, so older readers still work, but files saved by 1.3.0 should be opened with 1.3.0 or later.
 
