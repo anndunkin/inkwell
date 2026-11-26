@@ -1,410 +1,313 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
+import { Plus, Search, FolderOpen, LayoutList, Columns3, Trash2, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Trash2, FolderOpen, BookOpen, RefreshCw, CalendarClock, AlertTriangle } from "lucide-react";
 import RowMenu from "@/components/RowMenu";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { todayStr, formatDate as fmtDate } from "@/lib/dates";
-import MilestonePipeline from "@/components/MilestonePipeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { Textarea } from "@/components/ui/textarea";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { insertProjectSchema, type Project, type InsertProject, type Idea, type Deadline } from "@shared/schema";
-import { z } from "zod";
+import {
+  useProjects, useAllMilestones, useDeadlines, usePublications, useTemplates, useProjectTypes, refreshAll, PROJECT_STATUSES,
+} from "@/lib/data";
+import { buildEntries } from "@/lib/schedule";
+import { summarize, STATUS_STYLE, type ProjectSummary } from "@/lib/projectInfo";
+import { daysUntil, relativeDue } from "@/lib/dates";
 
-const DEFAULT_PROJECT_TYPES = ["article", "book", "essay", "blog", "speech", "report", "policy", "white paper", "other"];
-const DEFAULT_PUBLICATIONS: string[] = [];
-const STATUSES = ["active", "on-hold", "completed", "cancelled"];
+const VIEW_KEY = "inkwell.projectsView";
 
-const STATUS_COLS: Record<string, string> = {
-  active: "bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800",
-  "on-hold": "bg-yellow-50 border-yellow-200 dark:bg-yellow-900/10 dark:border-yellow-800",
-  completed: "bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800",
-  cancelled: "bg-gray-50 border-gray-200 dark:bg-gray-900/10 dark:border-gray-700",
-};
-
-const formSchema = insertProjectSchema.extend({ title: z.string().min(1, "Title is required") });
-type FormValues = z.infer<typeof formSchema>;
-
-function parseList(json: string | null | undefined, fallback: string[]): string[] {
-  if (!json) return fallback;
-  try { return JSON.parse(json) as string[]; } catch { return fallback; }
+function NextDue({ s }: { s: ProjectSummary }) {
+  if (!s.next) return <span className="text-muted-foreground">No dates</span>;
+  const d = daysUntil(s.next.dueDate);
+  return <span className={d < 0 ? "text-red-500 font-medium" : d <= 3 ? "text-orange-500 font-medium" : ""}>{relativeDue(s.next.dueDate)}</span>;
 }
 
-const today = todayStr;
-const formatDate = (d: string) => fmtDate(d, "long");
-
-/** Soonest not-yet-due, not-completed deadline for a project, or null. */
-function nextDeadline(deadlines: Deadline[], projectId: number): Deadline | null {
-  const t = today();
-  const upcoming = deadlines
-    .filter(d => d.projectId === projectId && d.status !== "completed" && d.dueDate > t)
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  return upcoming[0] ?? null;
+function Progress({ s }: { s: ProjectSummary }) {
+  if (s.stages.length === 0) return <span className="text-muted-foreground text-xs">No stages</span>;
+  return (
+    <div className="min-w-0">
+      <p className="text-sm truncate">{s.current ? s.current.name : "All stages done"}</p>
+      <div className="flex items-center gap-2 mt-1">
+        <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden" aria-hidden>
+          <div className="h-full bg-primary" style={{ width: `${(s.done / s.stages.length) * 100}%` }} />
+        </div>
+        <span className="text-xs text-muted-foreground">{s.done}/{s.stages.length}</span>
+      </div>
+    </div>
+  );
 }
 
 export default function ProjectsPage() {
   const { toast } = useToast();
   const confirm = useConfirm();
+  const [, navigate] = useLocation();
+  const projects = useProjects();
+  const milestones = useAllMilestones();
+  const deadlines = useDeadlines();
+  const pubs = usePublications();
+  const templates = useTemplates();
+  const { data: types } = useProjectTypes();
+
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editProject, setEditProject] = useState<Project | null>(null);
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [filter, setFilter] = useState("open");
+  const [view, setView] = useState<"list" | "board">(() => (localStorage.getItem(VIEW_KEY) === "board" ? "board" : "list"));
+  const [adding, setAdding] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
 
-  const { data: projects, isLoading } = useQuery<Project[]>({ queryKey: ["/api/projects"] });
-  const { data: ideas } = useQuery<Idea[]>({ queryKey: ["/api/ideas"] });
-  const { data: deadlines } = useQuery<Deadline[]>({ queryKey: ["/api/deadlines"] });
-  const { data: projectTypesRaw } = useQuery<string | null>({ queryKey: ["/api/settings/projectTypes"], queryFn: () => ipc().settings.get("projectTypes") });
-  const { data: publicationsRaw } = useQuery<string | null>({ queryKey: ["/api/settings/publications"], queryFn: () => ipc().settings.get("publications") });
+  // quick add
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState("article");
+  const [outlet, setOutlet] = useState("none");
+  const [templateId, setTemplateId] = useState("default");
+  const [error, setError] = useState("");
 
-  const projectTypes = parseList(projectTypesRaw, DEFAULT_PROJECT_TYPES);
-  const publications = parseList(publicationsRaw, DEFAULT_PUBLICATIONS);
+  const entries = useMemo(
+    () => buildEntries(deadlines.data ?? [], milestones.data ?? [], projects.data ?? []),
+    [deadlines.data, milestones.data, projects.data],
+  );
+  const summaries = useMemo(
+    () => (projects.data ?? []).map(p => summarize(p, milestones.data ?? [], entries)),
+    [projects.data, milestones.data, entries],
+  );
 
-  const INTERVALS = ["weekly", "biweekly", "monthly", "quarterly", "annual"];
-
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: { title: "", description: "", type: "article", status: "active", ideaId: null, publication: "", isRecurring: false, recurringInterval: null, notes: "", createdAt: "" },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data: InsertProject) => ipc().projects.create(data),
-    onSuccess: () => { queryClient.refetchQueries({ queryKey: ["/api/projects"] }); toast({ title: "Project created" }); closeDialog(); },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<InsertProject> }) => ipc().projects.update(id, data),
-    onSuccess: () => { queryClient.refetchQueries({ queryKey: ["/api/projects"] }); toast({ title: "Project updated" }); closeDialog(); },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => ipc().projects.delete(id),
-    onSuccess: () => { queryClient.refetchQueries({ queryKey: ["/api/projects"] }); toast({ title: "Project deleted" }); },
-  });
-
-  const spawnMutation = useMutation({
-    mutationFn: (projectId: number) => ipc().deadlines.spawnRecurring(projectId),
-    onSuccess: (result) => {
-      queryClient.refetchQueries({ queryKey: ["/api/deadlines"] });
-      queryClient.refetchQueries({ queryKey: ["/api/projects"] });
-      if (result) {
-        toast({ title: "Next instance created and added to your projects" });
-      } else {
-        toast({ title: "Could not schedule next occurrence — check that a deadline exists and the project is set to recurring" });
-      }
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Could not schedule the next occurrence";
-      toast({ title: msg, variant: "destructive" });
-    },
-  });
-
-  async function requestDelete(p: Project) {
-    const [ms, dl] = await Promise.all([ipc().milestones.getForProject(p.id), ipc().deadlines.getAll()]);
-    const deadlineCount = dl.filter(d => d.projectId === p.id).length;
-    const ok = await confirm({
-      title: `Delete "${p.title}"?`,
-      description: `This also deletes its ${ms.length} milestone${ms.length === 1 ? "" : "s"} and ${deadlineCount} deadline${deadlineCount === 1 ? "" : "s"}. This cannot be undone.`,
-    });
-    if (ok) deleteMutation.mutate(p.id);
-  }
-
-  function openNew() {
-    setEditProject(null);
-    form.reset({ title: "", description: "", type: "article", status: "active", ideaId: null, publication: "", isRecurring: false, recurringInterval: null, notes: "", createdAt: "" });
-    setDialogOpen(true);
-  }
-
-  function openEdit(p: Project) {
-    setEditProject(p);
-    form.reset({ title: p.title, description: p.description ?? "", type: p.type, status: p.status, ideaId: p.ideaId, publication: p.publication ?? "", isRecurring: p.isRecurring ?? false, recurringInterval: p.recurringInterval ?? null, notes: p.notes ?? "", createdAt: p.createdAt });
-    setDialogOpen(true);
-  }
-
-  function closeDialog() { setDialogOpen(false); setEditProject(null); }
-
-  function onSubmit(values: FormValues) {
-    const data = { ...values, publication: values.publication || null };
-    if (editProject) updateMutation.mutate({ id: editProject.id, data });
-    else createMutation.mutate(data);
-  }
-
-  const filtered = (projects ?? []).filter(p => {
-    if (filterStatus !== "all" && p.status !== filterStatus) return false;
-    if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
+  const visible = summaries.filter(s => {
+    const st = s.project.status;
+    if (filter === "open" && st !== "active" && st !== "on-hold") return false;
+    if (filter !== "open" && filter !== "all" && st !== filter) return false;
+    if (search && !s.project.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
+  }).sort((a, b) => {
+    // soonest next date first, undated last
+    const ad = a.next?.dueDate ?? "9999", bd = b.next?.dueDate ?? "9999";
+    return ad.localeCompare(bd) || a.project.title.localeCompare(b.project.title);
   });
 
-  const grouped: Record<string, Project[]> = {};
-  for (const s of STATUSES) grouped[s] = filtered.filter(p => p.status === s);
+  function setView_(v: "list" | "board") { setView(v); localStorage.setItem(VIEW_KEY, v); }
+  const outletName = (id: number | null) => (pubs.data ?? []).find(p => p.id === id)?.name ?? "";
+
+  async function create() {
+    if (!title.trim()) return setError("Title is required");
+    const tid = templateId === "default" ? undefined : templateId === "none" ? null : parseInt(templateId, 10);
+    const project = await ipc().projects.create({
+      title: title.trim(), description: null, type, status: "active", ideaId: null, publication: null,
+      publicationId: outlet === "none" ? null : parseInt(outlet, 10), isRecurring: false, recurringInterval: null, notes: null, createdAt: "",
+    }, tid === undefined ? (templates.data ?? []).find(t => t.isDefault)?.id ?? null : tid);
+    await refreshAll();
+    toast({ title: "Project created" });
+    setTitle(""); setAdding(false);
+    navigate(`/projects/${project.id}`);
+  }
+
+  async function setStatus(id: number, status: string) {
+    await ipc().projects.update(id, { status });
+    await refreshAll();
+  }
+
+  async function remove(s: ProjectSummary) {
+    const dl = (deadlines.data ?? []).filter(d => d.projectId === s.project.id).length;
+    const ok = await confirm({
+      title: `Delete "${s.project.title}"?`,
+      description: `This also deletes its ${s.stages.length} stage${s.stages.length === 1 ? "" : "s"} and ${dl} deadline${dl === 1 ? "" : "s"}. Publication history is kept.`,
+    });
+    if (!ok) return;
+    await ipc().projects.delete(s.project.id);
+    await refreshAll();
+    toast({ title: "Project deleted" });
+  }
+
+  const menu = (s: ProjectSummary) => (
+    <RowMenu
+      label={`Actions for ${s.project.title}`}
+      testId={`menu-project-${s.project.id}`}
+      items={[
+        ...PROJECT_STATUSES.filter(st => st !== s.project.status).map(st => ({
+          label: `Mark ${st}`, onSelect: () => setStatus(s.project.id, st), testId: `button-status-${st}-${s.project.id}`,
+        })),
+        { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: true, onSelect: () => remove(s), testId: `button-delete-project-${s.project.id}` },
+      ]}
+    />
+  );
+
+  const loading = projects.isLoading || milestones.isLoading;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-5 gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Projects</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{projects?.length ?? 0} projects</p>
+          <h1 className="text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>Projects</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{(projects.data ?? []).length} total</p>
         </div>
-        <Button onClick={openNew} data-testid="button-new-project" size="sm" className="gap-1.5">
-          <Plus className="w-4 h-4" /> New Project
+        <Button size="sm" className="gap-1.5" data-testid="button-new-project" onClick={() => setAdding(a => !a)}>
+          <Plus className="w-4 h-4" /> New project
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 mb-6">
+      {adding && (
+        <div className="rounded-lg border bg-card p-4 mb-5" data-testid="quick-add-project">
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] items-end">
+            <div className="space-y-1.5 min-w-0">
+              <label htmlFor="np-title" className="text-xs font-medium text-muted-foreground">Title</label>
+              <Input id="np-title" autoFocus data-testid="input-project-title" placeholder="Working title" value={title}
+                onChange={e => { setTitle(e.target.value); setError(""); }}
+                onKeyDown={e => { if (e.key === "Enter") void create(); }} />
+              {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Type</label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger className="w-36 capitalize" data-testid="select-project-type"><SelectValue /></SelectTrigger>
+                <SelectContent>{types.map(t => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Outlet</label>
+              <Select value={outlet} onValueChange={setOutlet}>
+                <SelectTrigger className="w-40" data-testid="select-project-outlet"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None yet</SelectItem>
+                  {(pubs.data ?? []).map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Stages</label>
+              <Select value={templateId} onValueChange={setTemplateId}>
+                <SelectTrigger className="w-40" data-testid="select-project-template"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default template</SelectItem>
+                  {(templates.data ?? []).map(t => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+                  <SelectItem value="none">No stages</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-3">
+            <Button variant="outline" size="sm" onClick={() => { setAdding(false); setError(""); }}>Cancel</Button>
+            <Button size="sm" data-testid="button-save-project" onClick={create}>Create project</Button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-3 mb-5 flex-wrap items-center">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input data-testid="input-search-projects" className="pl-9" placeholder="Search projects…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger data-testid="select-filter-project-status" className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+        <Select value={filter} onValueChange={setFilter}>
+          <SelectTrigger className="w-40" data-testid="select-project-filter"><SelectValue /></SelectTrigger>
           <SelectContent>
+            <SelectItem value="open">Open projects</SelectItem>
             <SelectItem value="all">All statuses</SelectItem>
-            {STATUSES.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+            {PROJECT_STATUSES.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
           </SelectContent>
         </Select>
-        <div className="flex border border-border rounded-md overflow-hidden">
-          <button onClick={() => setViewMode("kanban")} data-testid="button-kanban-view" className={`px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "kanban" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>Kanban</button>
-          <button onClick={() => setViewMode("list")} data-testid="button-list-view" className={`px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "list" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>List</button>
+        <div className="flex border border-border rounded-md overflow-hidden" role="group" aria-label="Projects view">
+          <button type="button" aria-pressed={view === "list"} data-testid="view-projects-list" onClick={() => setView_("list")}
+            className={`px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 ${view === "list" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+            <LayoutList className="w-3.5 h-3.5" /> List
+          </button>
+          <button type="button" aria-pressed={view === "board"} data-testid="view-projects-board" onClick={() => setView_("board")}
+            className={`px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 ${view === "board" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+            <Columns3 className="w-3.5 h-3.5" /> Board
+          </button>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-4 gap-4">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48" />)}</div>
-      ) : filtered.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-14" />)}</div>
+      ) : visible.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground">
           <FolderOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No projects found</p>
-          <p className="text-sm mt-1">Start a new writing project to track your progress.</p>
+          <p className="font-medium">No projects here</p>
+          <p className="text-sm mt-1">Create a project, or promote an idea.</p>
         </div>
-      ) : viewMode === "kanban" ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {STATUSES.map(s => (
-            <div key={s} className={`rounded-lg border p-3 ${STATUS_COLS[s]}`}>
-              <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 capitalize text-muted-foreground">
-                {s} <span className="ml-1 bg-background/60 px-1.5 py-0.5 rounded text-xs">{grouped[s].length}</span>
-              </h3>
-              <div className="space-y-2">
-                {grouped[s].map(p => (
-                  <div key={p.id} data-testid={`project-card-${p.id}`} className="group bg-card rounded-md p-3 border border-border shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start gap-1 mb-1.5">
-                      <p className="text-sm font-medium leading-snug flex-1">{p.title}</p>
-                      <RowMenu label={`Actions for ${p.title}`} testId={`menu-project-${p.id}`} items={[
-                        { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => openEdit(p), testId: `button-edit-project-${p.id}` },
-                        { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: true, onSelect: () => requestDelete(p), testId: `button-delete-project-${p.id}` },
-                      ]} />
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant="outline" className="text-xs capitalize">{p.type}</Badge>
-                      {p.isRecurring && p.recurringInterval && (
-                        <Badge variant="secondary" className="text-xs gap-1"><RefreshCw className="w-2.5 h-2.5" />{p.recurringInterval}</Badge>
-                      )}
-                    </div>
-                    {p.publication && (
-                      <div className="flex items-center gap-1 mt-1.5">
-                        <BookOpen className="w-3 h-3 text-muted-foreground shrink-0" />
-                        <span className="text-xs text-muted-foreground truncate">{p.publication}</span>
-                      </div>
-                    )}
-                    {p.description && <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{p.description}</p>}
-                    {p.isRecurring && !p.recurringInterval ? (
-                      <div className="flex items-center gap-1 mt-1.5 text-xs text-amber-600 dark:text-amber-500" data-testid={`recurring-interval-missing-${p.id}`}>
-                        <AlertTriangle className="w-3 h-3 shrink-0" />
-                        <span>Recurring interval not set — edit project to set one</span>
-                      </div>
-                    ) : p.isRecurring && p.recurringInterval && (() => {
-                      const next = nextDeadline(deadlines ?? [], p.id);
-                      return (
-                        <div className="flex items-center justify-between gap-2 mt-1.5" data-testid={`recurring-info-${p.id}`}>
-                          {next ? (
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
-                              <CalendarClock className="w-3 h-3 shrink-0" />
-                              <span className="truncate" data-testid={`recurring-next-${p.id}`}>Next due: {formatDate(next.dueDate)}</span>
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500 min-w-0" data-testid={`recurring-none-${p.id}`}>
-                              <CalendarClock className="w-3 h-3 shrink-0" />
-                              <span className="truncate">No upcoming deadline</span>
-                            </span>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-1.5 text-xs gap-1 shrink-0"
-                            onClick={() => spawnMutation.mutate(p.id)}
-                            disabled={spawnMutation.isPending}
-                            data-testid={`button-spawn-next-${p.id}`}
-                          >
-                            <RefreshCw className="w-3 h-3" /> Spawn Next
-                          </Button>
-                        </div>
-                      );
-                    })()}
-                    <MilestonePipeline projectId={p.id} projectTitle={p.title} />
-                  </div>
-                ))}
-                {grouped[s].length === 0 && <p className="text-xs text-muted-foreground text-center py-4">None</p>}
-              </div>
-            </div>
-          ))}
+      ) : view === "list" ? (
+        <div className="rounded-lg border bg-card overflow-x-auto">
+          <table className="w-full text-sm" data-testid="projects-table">
+            <thead>
+              <tr className="text-left text-xs text-muted-foreground border-b">
+                <th className="font-medium px-4 py-2.5">Project</th>
+                <th className="font-medium px-3 py-2.5">Outlet</th>
+                <th className="font-medium px-3 py-2.5">Stage</th>
+                <th className="font-medium px-3 py-2.5">Next due</th>
+                <th className="font-medium px-3 py-2.5">Status</th>
+                <th className="w-10" />
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map(s => (
+                <tr key={s.project.id} className="border-b last:border-0 hover:bg-muted/30" data-testid={`project-row-${s.project.id}`}>
+                  <td className="px-4 py-3 max-w-[18rem]">
+                    <Link href={`/projects/${s.project.id}`} className="font-medium hover:underline inline-flex items-center gap-1.5 max-w-full" data-testid={`link-project-${s.project.id}`}>
+                      <span className="truncate">{s.project.title}</span>
+                      {s.project.isRecurring && <RefreshCw className="w-3 h-3 text-muted-foreground shrink-0" aria-label="Recurring" />}
+                    </Link>
+                    <p className="text-xs text-muted-foreground capitalize">{s.project.type}</p>
+                  </td>
+                  <td className="px-3 py-3 text-muted-foreground">{outletName(s.project.publicationId) || s.project.publication || "—"}</td>
+                  <td className="px-3 py-3"><Progress s={s} /></td>
+                  <td className="px-3 py-3 whitespace-nowrap"><NextDue s={s} /></td>
+                  <td className="px-3 py-3"><Badge variant="outline" className={`text-xs ${STATUS_STYLE[s.project.status] ?? ""}`}>{s.project.status}</Badge></td>
+                  <td className="px-2 py-3">{menu(s)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map(p => (
-            <div key={p.id} data-testid={`project-row-${p.id}`} className="group flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:shadow-sm transition-shadow">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{p.title}</p>
-                  {p.publication && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <BookOpen className="w-3 h-3 text-muted-foreground shrink-0" />
-                      <span className="text-xs text-muted-foreground truncate">{p.publication}</span>
-                    </div>
-                  )}
-                  {p.description && <p className="text-xs text-muted-foreground truncate">{p.description}</p>}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0 ml-4">
-                <Badge variant="outline" className="text-xs capitalize">{p.type}</Badge>
-                <Badge variant="outline" className={`text-xs status-${p.status}`}>{p.status}</Badge>
-                <RowMenu label={`Actions for ${p.title}`} testId={`menu-project-${p.id}`} items={[
-                  { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => openEdit(p), testId: `button-edit-project-${p.id}` },
-                  { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: true, onSelect: () => requestDelete(p), testId: `button-delete-project-${p.id}` },
-                ]} />
-              </div>
+        <Board summaries={visible} filter={filter} showClosed={showClosed} setShowClosed={setShowClosed} menu={menu} />
+      )}
+    </div>
+  );
+}
+
+function Board({ summaries, filter, showClosed, setShowClosed, menu }: {
+  summaries: ProjectSummary[]; filter: string; showClosed: boolean; setShowClosed: (b: boolean) => void; menu: (s: ProjectSummary) => React.ReactNode;
+}) {
+  const col = (st: string) => summaries.filter(s => s.project.status === st);
+  const Card = ({ s }: { s: ProjectSummary }) => (
+    <div className="rounded-lg border bg-card p-3" data-testid={`project-card-${s.project.id}`}>
+      <div className="flex items-start justify-between gap-2">
+        <Link href={`/projects/${s.project.id}`} className="text-sm font-medium hover:underline break-words min-w-0">{s.project.title}</Link>
+        {menu(s)}
+      </div>
+      <p className="text-xs text-muted-foreground capitalize mt-0.5">{s.project.type}</p>
+      <div className="mt-2"><Progress s={s} /></div>
+      <p className="text-xs mt-2"><NextDue s={s} /></p>
+    </div>
+  );
+  const open = ["active", "on-hold"];
+  const closed = ["completed", "cancelled"].filter(st => col(st).length > 0);
+  return (
+    <div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {open.map(st => (
+          <div key={st}>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2.5">{st} ({col(st).length})</h2>
+            <div className="space-y-2">{col(st).map(s => <Card key={s.project.id} s={s} />)}</div>
+          </div>
+        ))}
+      </div>
+      {closed.length > 0 && (
+        <div className="mt-8">
+          <button type="button" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3"
+            onClick={() => setShowClosed(!showClosed)} aria-expanded={showClosed} data-testid="toggle-closed-projects">
+            {showClosed || filter === "completed" || filter === "cancelled" ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            Completed and cancelled ({closed.reduce((n, st) => n + col(st).length, 0)})
+          </button>
+          {(showClosed || filter === "completed" || filter === "cancelled") && (
+            <div className="grid gap-4 md:grid-cols-2">
+              {closed.map(st => (
+                <div key={st}><h2 className="text-xs font-semibold uppercase text-muted-foreground mb-2">{st}</h2>
+                  <div className="space-y-2">{col(st).map(s => <Card key={s.project.id} s={s} />)}</div></div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
-
-      {/* Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle style={{ fontFamily: "var(--font-display)" }}>{editProject ? "Edit Project" : "New Project"}</DialogTitle>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField control={form.control} name="title" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl><Input data-testid="input-project-title" placeholder="Project name…" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="description" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl><Textarea data-testid="input-project-description" placeholder="What's this project about?" rows={3} {...field} value={field.value ?? ""} /></FormControl>
-                </FormItem>
-              )} />
-              <div className="grid grid-cols-2 gap-3">
-                <FormField control={form.control} name="type" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl><SelectTrigger data-testid="select-project-type"><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>{projectTypes.map(t => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="status" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl><SelectTrigger data-testid="select-project-status"><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-              </div>
-              <FormField control={form.control} name="publication" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Publication <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
-                  <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                    <FormControl><SelectTrigger data-testid="select-project-publication"><SelectValue placeholder="Select a publication…" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      <SelectItem value="">Unspecified</SelectItem>
-                      {publications.map(pub => <SelectItem key={pub} value={pub}>{pub}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )} />
-              {(ideas?.length ?? 0) > 0 && (
-                <FormField control={form.control} name="ideaId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Linked Idea <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
-                    <Select value={field.value ? String(field.value) : "none"} onValueChange={v => field.onChange(v === "none" ? null : parseInt(v))}>
-                      <FormControl><SelectTrigger data-testid="select-project-idea"><SelectValue placeholder="Choose an idea…" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No linked idea</SelectItem>
-                        {ideas?.map(i => <SelectItem key={i.id} value={String(i.id)}>{i.title}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-              )}
-              {/* Recurring */}
-              <FormField control={form.control} name="isRecurring" render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="isRecurring"
-                      checked={!!field.value}
-                      onChange={e => {
-                        field.onChange(e.target.checked);
-                        if (e.target.checked && !form.getValues("recurringInterval")) {
-                          form.setValue("recurringInterval", "monthly");
-                        }
-                      }}
-                      className="h-4 w-4 rounded border-border accent-primary"
-                    />
-                    <label htmlFor="isRecurring" className="text-sm font-medium cursor-pointer select-none flex items-center gap-1.5">
-                      <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" /> Recurring project
-                    </label>
-                  </div>
-                </FormItem>
-              )} />
-              {form.watch("isRecurring") && (
-                <FormField control={form.control} name="recurringInterval" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Repeat interval</FormLabel>
-                    <Select value={field.value ?? "monthly"} onValueChange={v => { field.onChange(v); form.setValue("recurringInterval", v); }}>
-                      <FormControl><SelectTrigger data-testid="select-project-interval"><SelectValue placeholder="Select interval…" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {INTERVALS.map(i => <SelectItem key={i} value={i} className="capitalize">{i}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-              )}
-              <FormField control={form.control} name="notes" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl><Textarea data-testid="input-project-notes" placeholder="Any additional notes…" rows={2} {...field} value={field.value ?? ""} /></FormControl>
-                </FormItem>
-              )} />
-              <DialogFooter className="pt-2">
-                <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-                <Button type="submit" data-testid="button-save-project" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {editProject ? "Update" : "Create Project"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

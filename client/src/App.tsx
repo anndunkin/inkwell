@@ -1,13 +1,14 @@
-import { Switch, Route, Router } from "wouter";
+import { Switch, Route, Router, Redirect } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import Layout from "./components/Layout";
-import Dashboard from "./pages/Dashboard";
+import TodayPage from "./pages/TodayPage";
 import IdeasPage from "./pages/IdeasPage";
 import ProjectsPage from "./pages/ProjectsPage";
-import DeadlinesPage from "./pages/DeadlinesPage";
+import ProjectPage from "./pages/ProjectPage";
+import SchedulePage from "./pages/SchedulePage";
 import SettingsPage from "./pages/SettingsPage";
 import PublicationsPage from "./pages/PublicationsPage";
 import NotFound from "./pages/not-found";
@@ -19,19 +20,21 @@ export default function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <ConfirmProvider>
-        <Router hook={useHashLocation}>
-          <Layout>
-            <Switch>
-              <Route path="/" component={Dashboard} />
-              <Route path="/ideas" component={IdeasPage} />
-              <Route path="/projects" component={ProjectsPage} />
-              <Route path="/deadlines" component={DeadlinesPage} />
-              <Route path="/publications" component={PublicationsPage} />
-              <Route path="/settings" component={SettingsPage} />
-              <Route component={NotFound} />
-            </Switch>
-          </Layout>
-        </Router>
+          <Router hook={useHashLocation}>
+            <Layout>
+              <Switch>
+                <Route path="/" component={TodayPage} />
+                <Route path="/ideas" component={IdeasPage} />
+                <Route path="/projects" component={ProjectsPage} />
+                <Route path="/projects/:id" component={ProjectPage} />
+                <Route path="/schedule" component={SchedulePage} />
+                <Route path="/deadlines"><Redirect to="/schedule" /></Route>
+                <Route path="/publications" component={PublicationsPage} />
+                <Route path="/settings" component={SettingsPage} />
+                <Route component={NotFound} />
+              </Switch>
+            </Layout>
+          </Router>
         </ConfirmProvider>
         <Toaster />
       </QueryClientProvider>

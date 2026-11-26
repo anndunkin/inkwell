@@ -1,175 +1,74 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { useEffect, useState } from "react";
+import { Link } from "wouter";
+import { BookOpen, Plus, Trash2, Pencil, ExternalLink } from "lucide-react";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
-import {
-  BookOpen, Plus, Pencil, Trash2, Clock, RefreshCw, ChevronDown, ChevronUp, CalendarDays, StickyNote,
-} from "lucide-react";
-import RowMenu from "@/components/RowMenu";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { todayStr, parseDate } from "@/lib/dates";
+import RowMenu from "@/components/RowMenu";
+import AutoField from "@/components/AutoField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type {
-  InsertPublicationHistory,
-  PublicationHistory,
-  Project,
-  PublicationNote,
-} from "@shared/schema";
-
-// ---- helpers ----------------------------------------------------------------
-
-function parseList(json: string | null | undefined, fallback: string[]): string[] {
-  if (!json) return fallback;
-  try { return JSON.parse(json) as string[]; } catch { return fallback; }
-}
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { usePublications, useProjects, usePubHistory, refreshAll } from "@/lib/data";
+import { todayStr, formatDate, parseDate } from "@/lib/dates";
+import type { Publication, PublicationHistory } from "@shared/schema";
 
 function daysSince(dateStr: string): number {
-  const d = parseDate(dateStr);
-  const now = new Date();
-  return Math.floor((now.getTime() - d.getTime()) / 86_400_000);
+  return Math.floor((parseDate(todayStr()).getTime() - parseDate(dateStr).getTime()) / 86_400_000);
+}
+function sinceLabel(dateStr: string): string {
+  const d = daysSince(dateStr);
+  if (d <= 0) return "today";
+  if (d === 1) return "yesterday";
+  if (d < 60) return `${d} days ago`;
+  return `${Math.round(d / 30)} months ago`;
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
-    year: "numeric", month: "short", day: "numeric",
-  });
-}
-
-const INTERVAL_DAYS: Record<string, number> = {
-  weekly: 7,
-  biweekly: 14,
-  monthly: 30,
-  quarterly: 91,
-  annual: 365,
-};
-
-function nextDueDate(lastDate: string, interval: string): Date {
-  const days = INTERVAL_DAYS[interval] ?? 30;
-  const d = new Date(lastDate + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function daysUntil(date: Date): number {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return Math.floor((date.getTime() - now.getTime()) / 86_400_000);
-}
-
-function statusColor(days: number): string {
-  if (days < 0) return "text-destructive";
-  if (days <= 7) return "text-orange-500";
-  if (days <= 14) return "text-yellow-600 dark:text-yellow-400";
-  return "text-green-600 dark:text-green-400";
-}
-
-// ---- LogDialog: add/edit a history entry ------------------------------------
-
-interface LogDialogProps {
-  open: boolean;
-  onClose: () => void;
-  projects: Project[];
-  editing: PublicationHistory | null;
-}
-
-function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
-  // Query publications fresh inside the dialog so newly added outlets appear
-  // immediately without needing to close and reopen.
-  const { data: pubsRaw } = useQuery<string | null>({
-    queryKey: ["/api/settings/publications"],
-    queryFn: () => ipc().settings.get("publications"),
-  });
-  const publications = parseList(pubsRaw, []);
+function LogDialog({ open, onClose, outlet, editing }: { open: boolean; onClose: () => void; outlet: Publication; editing: PublicationHistory | null }) {
   const { toast } = useToast();
-  const today = todayStr();
+  const { data: projects = [] } = useProjects();
+  const [projectId, setProjectId] = useState("none");
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState(todayStr());
+  const [notes, setNotes] = useState("");
+  const [error, setError] = useState("");
 
-  const [pub, setPub] = useState(editing?.publication ?? "");
-  const [projectId, setProjectId] = useState<string>(editing?.projectId ? String(editing.projectId) : "none");
-  const [projectTitle, setProjectTitle] = useState(editing?.projectTitle ?? "");
-  const [date, setDate] = useState(editing?.publishedDate ?? today);
-  const [notes, setNotes] = useState(editing?.notes ?? "");
-
-  // sync when editing changes
-  useState(() => {
-    setPub(editing?.publication ?? "");
+  useEffect(() => {
+    if (!open) return;
     setProjectId(editing?.projectId ? String(editing.projectId) : "none");
-    setProjectTitle(editing?.projectTitle ?? "");
-    setDate(editing?.publishedDate ?? today);
+    setTitle(editing?.projectTitle ?? "");
+    setDate(editing?.publishedDate ?? todayStr());
     setNotes(editing?.notes ?? "");
-  });
+    setError("");
+  }, [open, editing]);
 
-  const createMutation = useMutation({
-    mutationFn: (data: InsertPublicationHistory) => ipc().pubHistory.create(data),
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ["/api/pubHistory"] });
-      toast({ title: "Entry logged" });
-      onClose();
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<InsertPublicationHistory> }) =>
-      ipc().pubHistory.update(id, data),
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ["/api/pubHistory"] });
-      toast({ title: "Entry updated" });
-      onClose();
-    },
-  });
-
-  function save() {
-    if (!pub || !date) return;
-    // Resolve project title from linked project if one is selected
-    const linkedProject = projects.find(p => String(p.id) === projectId);
-    const resolvedTitle = linkedProject ? linkedProject.title : projectTitle || "Untitled";
-    const data = {
-      publication: pub,
-      projectId: linkedProject ? linkedProject.id : null,
-      projectTitle: resolvedTitle,
-      publishedDate: date,
-      notes: notes || null,
-      createdAt: "",
-    };
-    if (editing) {
-      updateMutation.mutate({ id: editing.id, data });
-    } else {
-      createMutation.mutate(data);
-    }
+  async function save() {
+    if (!date) return setError("Date is required");
+    const linked = projects.find(p => String(p.id) === projectId);
+    const resolved = linked?.title ?? (title.trim() || "Untitled");
+    const data = { publication: outlet.name, projectId: linked?.id ?? null, projectTitle: resolved, publishedDate: date, notes: notes || null, createdAt: "" };
+    if (editing) await ipc().pubHistory.update(editing.id, data);
+    else await ipc().pubHistory.create(data);
+    await refreshAll();
+    toast({ title: editing ? "Entry updated" : "Entry logged" });
+    onClose();
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit Entry" : "Log Published Work"}</DialogTitle>
+          <DialogTitle style={{ fontFamily: "var(--font-display)" }}>{editing ? "Edit entry" : `Log a piece in ${outlet.name}`}</DialogTitle>
+          <DialogDescription className="sr-only">Publication history entry</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Publication</label>
-            <Select value={pub} onValueChange={setPub}>
-              <SelectTrigger><SelectValue placeholder="Select publication…" /></SelectTrigger>
-              <SelectContent>
-                {publications.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
             <label className="text-sm font-medium">Project <span className="text-muted-foreground font-normal">(optional)</span></label>
-            <Select value={projectId} onValueChange={v => {
-              setProjectId(v);
-              if (v !== "none") {
-                const p = projects.find(p => String(p.id) === v);
-                if (p) setProjectTitle(p.title);
-              }
-            }}>
-              <SelectTrigger><SelectValue placeholder="Link to a project…" /></SelectTrigger>
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger data-testid="select-log-project"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No linked project</SelectItem>
                 {projects.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.title}</SelectItem>)}
@@ -178,308 +77,189 @@ function LogDialog({ open, onClose, projects, editing }: LogDialogProps) {
           </div>
           {projectId === "none" && (
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Article / Piece Title</label>
-              <Input placeholder="Title of the piece…" value={projectTitle} onChange={e => setProjectTitle(e.target.value)} />
+              <label htmlFor="log-title" className="text-sm font-medium">Title of the piece</label>
+              <Input id="log-title" data-testid="input-log-title" value={title} onChange={e => setTitle(e.target.value)} />
             </div>
           )}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Published Date</label>
-            <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+            <label htmlFor="log-date" className="text-sm font-medium">Date</label>
+            <Input id="log-date" type="date" data-testid="input-log-date" value={date} onChange={e => setDate(e.target.value)} />
+            {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Notes <span className="text-muted-foreground font-normal">(optional)</span></label>
-            <Textarea placeholder="Any notes…" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
+            <label htmlFor="log-notes" className="text-sm font-medium">Notes</label>
+            <Textarea id="log-notes" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={!pub || !date || createMutation.isPending || updateMutation.isPending}>
-            {editing ? "Update" : "Log Entry"}
-          </Button>
+          <Button onClick={save} data-testid="button-save-log">{editing ? "Update" : "Log entry"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-// ---- PublicationNotesSection ------------------------------------------------
-
-function PublicationNotesSection({ name, savedNotes }: { name: string; savedNotes: string }) {
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(savedNotes);
-
-  const upsertMutation = useMutation({
-    mutationFn: (notes: string) => ipc().pubNotes.upsert(name, notes),
-    onSuccess: () => queryClient.refetchQueries({ queryKey: ["pubNotes"] }),
-  });
-
-  function handleBlur() {
-    if (value !== savedNotes) upsertMutation.mutate(value);
-  }
-
-  return (
-    <div className="border-t border-border">
-      <button
-        data-testid={`button-toggle-pub-notes-${name}`}
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-6 py-2 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
-      >
-        <span className="flex items-center gap-1.5">
-          <StickyNote className="w-3.5 h-3.5" />
-          Notes{savedNotes ? "" : <span className="text-muted-foreground/60"> (empty)</span>}
-        </span>
-        {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-      </button>
-      {open && (
-        <div className="px-6 pb-4">
-          <Textarea
-            data-testid={`textarea-pub-notes-${name}`}
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            onBlur={handleBlur}
-            rows={3}
-            className="resize-y min-h-[4.5rem] text-sm"
-            placeholder="Add contacts, submission guidelines, rates..."
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---- PublicationCard --------------------------------------------------------
-
-interface PubCardProps {
-  name: string;
-  entries: PublicationHistory[];
-  recurringProjects: Project[];
-  savedNotes: string;
-  onLog: (pub: string) => void;
-  onEdit: (entry: PublicationHistory) => void;
-  onDelete: (id: number) => void;
-}
-
-function PublicationCard({ name, entries, recurringProjects, savedNotes, onLog, onEdit, onDelete }: PubCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const latest = entries[0]; // already sorted desc by date
-  const dayCount = latest ? daysSince(latest.publishedDate) : null;
-
-  // Recurring projects targeting this publication
-  const recurring = recurringProjects.filter(p => p.publication === name && p.isRecurring && p.recurringInterval);
-
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-3 flex flex-row items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <CardTitle className="text-base">{name}</CardTitle>
-            {recurring.length > 0 && (
-              <Badge variant="secondary" className="gap-1 text-xs">
-                <RefreshCw className="w-3 h-3" /> Recurring
-              </Badge>
-            )}
-          </div>
-          {latest ? (
-            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 shrink-0" />
-              Last published <span className="font-medium text-foreground">{formatDate(latest.publishedDate)}</span>
-              <span className="text-muted-foreground">({dayCount === 0 ? "today" : `${dayCount}d ago`})</span>
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground mt-1 italic">No publications recorded yet</p>
-          )}
-        </div>
-        <Button size="sm" variant="outline" className="shrink-0 gap-1.5" onClick={() => onLog(name)}>
-          <Plus className="w-3.5 h-3.5" /> Log
-        </Button>
-      </CardHeader>
-
-      {/* Recurring next-due section */}
-      {recurring.length > 0 && (
-        <div className="px-6 pb-3 space-y-1.5">
-          {recurring.map(p => {
-            if (!p.recurringInterval) return null;
-            const lastDate = latest?.publishedDate;
-            if (!lastDate) return (
-              <div key={p.id} className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <CalendarDays className="w-3.5 h-3.5" />
-                <span className="font-medium">{p.title}</span> — no history to calculate next due
-              </div>
-            );
-            const next = nextDueDate(lastDate, p.recurringInterval);
-            const until = daysUntil(next);
-            return (
-              <div key={p.id} className={`text-xs flex items-center gap-1.5 ${statusColor(until)}`}>
-                <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-                <span className="font-medium text-foreground">{p.title}</span>
-                <span className="capitalize text-muted-foreground">({p.recurringInterval})</span>
-                <span>—</span>
-                <span className={`font-medium ${statusColor(until)}`}>
-                  {until < 0
-                    ? `${Math.abs(until)}d overdue`
-                    : until === 0
-                      ? "due today"
-                      : `due in ${until}d`}
-                </span>
-                <span className="text-muted-foreground">({next.toLocaleDateString("en-US", { month: "short", day: "numeric" })})</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* History toggle */}
-      {entries.length > 0 && (
-        <div className="border-t border-border">
-          <button
-            onClick={() => setExpanded(v => !v)}
-            className="w-full flex items-center justify-between px-6 py-2 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
-          >
-            <span>{entries.length} {entries.length === 1 ? "entry" : "entries"} in history</span>
-            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-          {expanded && (
-            <div className="px-6 pb-4 space-y-2">
-              {entries.map(entry => (
-                <div key={entry.id} className="group flex items-center justify-between gap-2 text-sm py-1 border-b border-border/50 last:border-0">
-                  <div className="min-w-0">
-                    <span className="font-medium truncate">{entry.projectTitle || "Untitled"}</span>
-                    <span className="text-muted-foreground ml-2">{formatDate(entry.publishedDate)}</span>
-                    {entry.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate">{entry.notes}</p>}
-                  </div>
-                  <RowMenu label={`Actions for ${entry.projectTitle || "entry"}`} items={[
-                    { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => onEdit(entry) },
-                    { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: true, onSelect: () => onDelete(entry.id) },
-                  ]} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <PublicationNotesSection key={`${name}:${savedNotes}`} name={name} savedNotes={savedNotes} />
-    </Card>
-  );
-}
-
-// ---- Main page --------------------------------------------------------------
-
 export default function PublicationsPage() {
   const { toast } = useToast();
   const confirm = useConfirm();
+  const pubs = usePublications();
+  const projects = useProjects();
+  const history = usePubHistory();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [newName, setNewName] = useState("");
   const [logOpen, setLogOpen] = useState(false);
-  const [logPub, setLogPub] = useState<string>("");
-  const [editing, setEditing] = useState<PublicationHistory | null>(null);
+  const [editingLog, setEditingLog] = useState<PublicationHistory | null>(null);
 
-  const { data: history = [] } = useQuery<PublicationHistory[]>({
-    queryKey: ["/api/pubHistory"],
-    queryFn: () => ipc().pubHistory.getAll(),
-  });
-  const { data: projects = [] } = useQuery<Project[]>({ queryKey: ["/api/projects"] });
-  const { data: pubsRaw } = useQuery<string | null>({
-    queryKey: ["/api/settings/publications"],
-    queryFn: () => ipc().settings.get("publications"),
-  });
-  const publications = parseList(pubsRaw, []);
-  const { data: pubNotes = [] } = useQuery<PublicationNote[]>({
-    queryKey: ["pubNotes"],
-    queryFn: () => ipc().pubNotes.getAll(),
-  });
-  const notesByPub: Record<string, string> = {};
-  for (const n of pubNotes) notesByPub[n.publicationName] = n.notes;
+  const list = [...(pubs.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+  const selected = list.find(p => p.id === selectedId) ?? list[0] ?? null;
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => ipc().pubHistory.delete(id),
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ["/api/pubHistory"] });
-      toast({ title: "Entry deleted" });
-    },
-  });
+  const entriesFor = (name: string) => (history.data ?? []).filter(h => h.publication.toLowerCase() === name.toLowerCase());
+  const lastFor = (name: string) => entriesFor(name).map(h => h.publishedDate).sort().pop();
 
-  function openLog(pub: string) {
-    setLogPub(pub);
-    setEditing(null);
-    setLogOpen(true);
+  async function add() {
+    const name = newName.trim();
+    if (!name) return;
+    if (list.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      toast({ title: "That outlet already exists", variant: "destructive" });
+      return;
+    }
+    const p = await ipc().publications.create({ name });
+    await refreshAll();
+    setNewName(""); setSelectedId(p.id);
+  }
+  async function patch(p: Publication, data: Partial<Publication>) {
+    try { await ipc().publications.update(p.id, data); await refreshAll(); }
+    catch { toast({ title: "Could not save", description: "An outlet with that name may already exist.", variant: "destructive" }); await refreshAll(); }
+  }
+  async function remove(p: Publication) {
+    const n = (projects.data ?? []).filter(x => x.publicationId === p.id).length;
+    const ok = await confirm({
+      title: `Delete "${p.name}"?`,
+      description: `${n} project${n === 1 ? "" : "s"} will lose this outlet. Publication history entries are kept.`,
+    });
+    if (!ok) return;
+    await ipc().publications.delete(p.id);
+    setSelectedId(null);
+    await refreshAll();
+    toast({ title: "Outlet deleted" });
+  }
+  async function removeLog(h: PublicationHistory) {
+    const ok = await confirm({ title: `Delete the entry for "${h.projectTitle}"?` });
+    if (!ok) return;
+    await ipc().pubHistory.delete(h.id);
+    await refreshAll();
   }
 
-  function openEdit(entry: PublicationHistory) {
-    setEditing(entry);
-    setLogPub(entry.publication);
-    setLogOpen(true);
-  }
-
-  // Group history by publication
-  const byPub: Record<string, PublicationHistory[]> = {};
-  for (const pub of publications) byPub[pub] = [];
-  for (const entry of history) {
-    if (!byPub[entry.publication]) byPub[entry.publication] = [];
-    byPub[entry.publication].push(entry);
-  }
-  // Ensure entries within each pub are sorted newest-first
-  for (const pub of Object.keys(byPub)) {
-    byPub[pub].sort((a, b) => b.publishedDate.localeCompare(a.publishedDate));
-  }
-
-  // Sort publication cards: those with history first (most recent first), then without
-  const sorted = [...publications].sort((a, b) => {
-    const aLast = byPub[a]?.[0]?.publishedDate ?? "";
-    const bLast = byPub[b]?.[0]?.publishedDate ?? "";
-    if (aLast && !bLast) return -1;
-    if (!aLast && bLast) return 1;
-    return bLast.localeCompare(aLast);
-  });
-
-  const recurringProjects = projects.filter(p => p.isRecurring);
+  const targeting = selected ? (projects.data ?? []).filter(p => p.publicationId === selected.id && (p.status === "active" || p.status === "on-hold")) : [];
+  const entries = selected ? entriesFor(selected.name).sort((a, b) => b.publishedDate.localeCompare(a.publishedDate)) : [];
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <BookOpen className="w-5 h-5 text-muted-foreground" />
-            <h1 className="text-xl font-semibold">Publications</h1>
-          </div>
-          <p className="text-sm text-muted-foreground">Track when you last wrote for each outlet and when recurring pieces are due.</p>
-        </div>
-        <Button size="sm" className="gap-1.5" onClick={() => { setEditing(null); setLogPub(""); setLogOpen(true); }}>
-          <Plus className="w-4 h-4" /> Log Entry
-        </Button>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="mb-5">
+        <h1 className="text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>Publications</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Outlets you write for, with notes and history</p>
       </div>
 
-      {publications.length === 0 ? (
-        <div className="text-center py-20 text-muted-foreground">
-          <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No publications configured</p>
-          <p className="text-sm mt-1">Add publications in Settings to start tracking.</p>
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-1">
-          {sorted.map(pub => (
-            <PublicationCard
-              key={pub}
-              name={pub}
-              entries={byPub[pub] ?? []}
-              recurringProjects={recurringProjects}
-              savedNotes={notesByPub[pub] ?? ""}
-              onLog={openLog}
-              onEdit={openEdit}
-              onDelete={async (id) => {
-                const entry = history.find(h => h.id === id);
-                const ok = await confirm({ title: `Delete history entry "${entry?.projectTitle || "Untitled"}"?` });
-                if (ok) deleteMutation.mutate(id);
-              }}
-            />
-          ))}
-        </div>
-      )}
+      <div className="grid gap-6 md:grid-cols-[18rem_1fr]">
+        <aside>
+          <div className="flex gap-2 mb-3">
+            <Input placeholder="Add an outlet" value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") void add(); }} className="h-9" data-testid="input-new-publication" />
+            <Button size="sm" className="h-9 gap-1" onClick={add} data-testid="button-add-publication"><Plus className="w-4 h-4" /> Add</Button>
+          </div>
+          {list.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No outlets yet.</p>
+          ) : (
+            <ul className="space-y-1" data-testid="publication-list">
+              {list.map(p => {
+                const last = lastFor(p.name);
+                return (
+                  <li key={p.id}>
+                    <button type="button" onClick={() => setSelectedId(p.id)} data-testid={`publication-${p.id}`}
+                      className={`w-full text-left rounded-md px-3 py-2 border ${selected?.id === p.id ? "bg-primary/10 border-primary/40" : "border-transparent hover:bg-muted"}`}>
+                      <span className="block text-sm font-medium truncate">{p.name}</span>
+                      <span className="block text-xs text-muted-foreground">{last ? `Last piece ${sinceLabel(last)}` : "No history yet"}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </aside>
 
-      <LogDialog
-        open={logOpen}
-        onClose={() => setLogOpen(false)}
-        projects={projects}
-        editing={editing}
-      />
+        <section className="min-w-0">
+          {!selected ? (
+            <div className="text-center py-20 text-muted-foreground"><BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" /><p className="text-sm">Add an outlet to start.</p></div>
+          ) : (
+            <div data-testid="publication-detail" key={selected.id}>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex-1 min-w-0">
+                  <AutoField value={selected.name} required ariaLabel="Outlet name" testId="input-publication-name" onSave={v => patch(selected, { name: v.trim() })}
+                    className="text-lg font-semibold h-auto py-1.5 px-2 -mx-2 border-transparent hover:border-input focus-visible:border-input shadow-none bg-transparent" />
+                </div>
+                <RowMenu label="Outlet actions" testId="menu-publication" items={[
+                  { label: "Delete outlet", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, onSelect: () => remove(selected), testId: "button-delete-publication" },
+                ]} />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 mb-4">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Guidelines link</label>
+                  <div className="flex gap-1.5">
+                    <AutoField value={selected.guidelinesUrl ?? ""} ariaLabel="Guidelines link" testId="input-publication-url" placeholder="https://…" onSave={v => patch(selected, { guidelinesUrl: v.trim() || null })} />
+                    {selected.guidelinesUrl && /^https?:\/\//i.test(selected.guidelinesUrl) && (
+                      <a href={selected.guidelinesUrl} target="_blank" rel="noreferrer" aria-label="Open guidelines" className="p-2 rounded border hover:bg-muted shrink-0"><ExternalLink className="w-4 h-4" /></a>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Rate</label>
+                  <AutoField value={selected.rate ?? ""} ariaLabel="Rate" testId="input-publication-rate" placeholder="e.g. $0.50 per word" onSave={v => patch(selected, { rate: v.trim() || null })} />
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-xs text-muted-foreground mb-1">Notes (editor contacts, pitching tips)</label>
+                <AutoField multiline rows={5} value={selected.notes} ariaLabel="Notes" testId="input-publication-notes" onSave={v => patch(selected, { notes: v })} />
+              </div>
+
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">In progress here ({targeting.length})</h2>
+              {targeting.length === 0 ? <p className="text-sm text-muted-foreground mb-6">No open projects target this outlet.</p> : (
+                <ul className="space-y-1.5 mb-6">
+                  {targeting.map(p => (
+                    <li key={p.id} className="flex items-center justify-between rounded-lg border bg-card px-3 py-2 text-sm">
+                      <Link href={`/projects/${p.id}`} className="font-medium hover:underline truncate">{p.title}</Link>
+                      <Badge variant="outline" className="text-xs capitalize">{p.status}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">History ({entries.length})</h2>
+                <Button size="sm" variant="outline" className="gap-1" onClick={() => { setEditingLog(null); setLogOpen(true); }} data-testid="button-log-entry"><Plus className="w-4 h-4" /> Log a piece</Button>
+              </div>
+              {entries.length === 0 ? <p className="text-sm text-muted-foreground">Nothing logged yet.</p> : (
+                <ul className="space-y-1.5">
+                  {entries.map(h => (
+                    <li key={h.id} className="flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2" data-testid={`history-${h.id}`}>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{h.projectTitle}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(h.publishedDate, "long")}{h.notes ? ` · ${h.notes}` : ""}</p>
+                      </div>
+                      <RowMenu label={`Actions for ${h.projectTitle}`} testId={`menu-history-${h.id}`} items={[
+                        { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => { setEditingLog(h); setLogOpen(true); }, testId: `button-edit-history-${h.id}` },
+                        { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: true, onSelect: () => removeLog(h), testId: `button-delete-history-${h.id}` },
+                      ]} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <LogDialog open={logOpen} onClose={() => { setLogOpen(false); setEditingLog(null); }} outlet={selected} editing={editingLog} />
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

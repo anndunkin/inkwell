@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ipc } from "@/lib/ipc";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, ArrowUpRight, ExternalLink } from "lucide-react";
+import { useProjects } from "@/lib/data";
 import RowMenu from "@/components/RowMenu";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,16 @@ export default function IdeasPage() {
   const [filterCat, setFilterCat] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editIdea, setEditIdea] = useState<Idea | null>(null);
+  const [, navigate] = useLocation();
+  const { data: projects = [] } = useProjects();
+  const projectFor = (ideaId: number) => projects.find(p => p.ideaId === ideaId);
+
+  async function promote(idea: Idea) {
+    const project = await ipc().ideas.promote(idea.id, {});
+    await queryClient.invalidateQueries();
+    toast({ title: "Idea promoted to a project" });
+    navigate(`/projects/${project.id}`);
+  }
 
   const { data: ideas, isLoading } = useQuery<Idea[]>({ queryKey: ["/api/ideas"] });
 
@@ -146,7 +158,7 @@ export default function IdeasPage() {
         </div>
       ) : filterStatus !== "all" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(idea => <IdeaCard key={idea.id} idea={idea} onEdit={openEdit} onDelete={requestDelete} />)}
+          {filtered.map(idea => <IdeaCard key={idea.id} idea={idea} onEdit={openEdit} onDelete={requestDelete} onPromote={promote} project={projectFor(idea.id)} onOpen={(id) => navigate(`/projects/${id}`)} />)}
         </div>
       ) : (
         <div className="space-y-8">
@@ -154,7 +166,7 @@ export default function IdeasPage() {
             <div key={s}>
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 capitalize">{s} ({grouped[s].length})</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {grouped[s].map(idea => <IdeaCard key={idea.id} idea={idea} onEdit={openEdit} onDelete={requestDelete} />)}
+                {grouped[s].map(idea => <IdeaCard key={idea.id} idea={idea} onEdit={openEdit} onDelete={requestDelete} onPromote={promote} project={projectFor(idea.id)} onOpen={(id) => navigate(`/projects/${id}`)} />)}
               </div>
             </div>
           ))}
@@ -228,7 +240,7 @@ export default function IdeasPage() {
   );
 }
 
-function IdeaCard({ idea, onEdit, onDelete }: { idea: Idea; onEdit: (i: Idea) => void; onDelete: (idea: Idea) => void }) {
+function IdeaCard({ idea, onEdit, onDelete, onPromote, project, onOpen }: { idea: Idea; onEdit: (i: Idea) => void; onDelete: (idea: Idea) => void; onPromote: (i: Idea) => void; project?: { id: number }; onOpen: (id: number) => void }) {
   const tags = JSON.parse(idea.tags || "[]") as string[];
   return (
     <Card data-testid={`idea-card-${idea.id}`} className="group hover:shadow-md transition-shadow">
@@ -239,6 +251,9 @@ function IdeaCard({ idea, onEdit, onDelete }: { idea: Idea; onEdit: (i: Idea) =>
             label={`Actions for ${idea.title}`}
             testId={`menu-idea-${idea.id}`}
             items={[
+              project
+                ? { label: "Open project", icon: <ExternalLink className="w-3.5 h-3.5" />, onSelect: () => onOpen(project.id), testId: `button-open-idea-project-${idea.id}` }
+                : { label: "Promote to project", icon: <ArrowUpRight className="w-3.5 h-3.5" />, onSelect: () => onPromote(idea), testId: `menu-promote-idea-${idea.id}` },
               { label: "Edit", icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => onEdit(idea), testId: `button-edit-idea-${idea.id}` },
               { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, separated: true, onSelect: () => onDelete(idea), testId: `button-delete-idea-${idea.id}` },
             ]}
@@ -249,6 +264,17 @@ function IdeaCard({ idea, onEdit, onDelete }: { idea: Idea; onEdit: (i: Idea) =>
           <Badge variant="outline" className={`text-xs status-${idea.status}`}>{idea.status}</Badge>
           <Badge variant="outline" className="text-xs capitalize">{idea.category}</Badge>
           {tags.map((t, i) => <span key={i} className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm">{t}</span>)}
+        </div>
+        <div className="mt-3">
+          {project ? (
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onOpen(project.id)} data-testid={`button-view-project-${idea.id}`}>
+              <ExternalLink className="w-3 h-3" /> Open project
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onPromote(idea)} data-testid={`button-promote-idea-${idea.id}`}>
+              <ArrowUpRight className="w-3 h-3" /> Promote to project
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
